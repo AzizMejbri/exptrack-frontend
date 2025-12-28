@@ -1,0 +1,106 @@
+// sidebar.component.scss
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  position: fixed;
+  left: 0;
+  top: 64px; // Below header
+  overflow-y: auto;
+  z-index: 900;
+}
+
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid #e5e7eb;
+
+  h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &.active {
+      background: #eff6ff;
+      border-left-color: #3b82f6;
+
+      .menu-label {
+        color: #3b82f6;
+        font-weight: 600;
+      }
+
+      .menu-icon {
+        transform: scale(1.1);
+      }
+    }
+
+    .menu-icon {
+      font-size: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    .menu-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      transition: color 0.2s ease;
+    }
+  }
+}
+
+// Dark theme styles
+:host-context(.dark-theme) {
+  .sidebar {
+    background: #1f2937;
+    border-right-color: #374151;
+  }
+
+  .sidebar-header {
+    border-bottom-color: #374151;
+
+    h3 {
+      color: #9ca3af;
+    }
+  }
+
+  .menu-item {
+    &:hover {
+      background: #374151;
+    }
+
+    &.active {
+      background: #1e40af;
+
+      .menu-label {
+        color: #60a5fa;
+      }
+    }
+
+    .menu-label {
+      color: #e5e7eb;
+    }
+  }
+}

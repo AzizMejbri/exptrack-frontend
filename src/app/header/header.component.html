@@ -1,0 +1,35 @@
+<!-- header.component.html -->
+<header class="app-header">
+  <div class="header-left">
+    <h1 class="app-title">ExpenseTracker</h1>
+  </div>
+
+  <div class="header-right">
+    <!-- Dark Mode Toggle -->
+    <button class="theme-toggle" (click)="toggleDarkMode()" [title]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'">
+      <span class="theme-icon" [class.dark]="isDarkMode">
+        {{ isDarkMode ? '☀️' : '🌙' }}
+      </span>
+    </button>
+
+    <!-- User Profile Dropdown -->
+    <div class="user-menu">
+      <button class="user-button" (click)="viewProfile()">
+        <div class="user-avatar">{{ user.avatar }}</div>
+        <span class="user-name">{{ user.name }}</span>
+        <span class="dropdown-arrow">▼</span>
+      </button>
+
+      <div class="dropdown-menu">
+        <div class="dropdown-item" (click)="viewProfile()">
+          <span class="item-icon">👤</span>
+          My Profile
+        </div>
+        <div class="dropdown-item" (click)="logout()">
+          <span class="item-icon">🚪</span>
+          Logout
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

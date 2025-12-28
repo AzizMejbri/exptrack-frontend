@@ -1,0 +1,27 @@
+// layout.component.scss
+.app-layout {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.main-content {
+  margin-left: 250px; // Sidebar width
+  margin-top: 64px; // Header height
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+}
+
+// Dark theme
+:host-context(.dark-theme) {
+  .app-layout {
+    background: #111827;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+  }
+}

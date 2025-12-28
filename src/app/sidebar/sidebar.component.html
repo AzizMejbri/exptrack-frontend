@@ -1,0 +1,16 @@
+<!-- sidebar.component.html -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h3>Navigation</h3>
+  </div>
+
+  <ul class="sidebar-menu">
+    <li *ngFor="let item of this.menuItems"
+        class="menu-item"
+        [class.active]="item.isActive"
+        (click)="navigateTo(item.route)">
+      <span class="menu-icon">{{ item.icon }}</span>
+      <span class="menu-label">{{ item.label }}</span>
+    </li>
+  </ul>
+</nav>

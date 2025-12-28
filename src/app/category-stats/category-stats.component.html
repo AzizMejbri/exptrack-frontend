@@ -1,0 +1,314 @@
+<!-- category-stats.component.html -->
+<div class="category-stats-container">
+  <!-- Header -->
+  <header class="stats-header">
+    <div class="header-content">
+      <h1>Category Statistics</h1>
+      <p>Detailed breakdown of your spending and income by category</p>
+    </div>
+
+    <div class="header-controls">
+      <select [(ngModel)]="selectedTimeFrame" (change)="onTimeFrameChange()" class="time-select">
+        <option *ngFor="let frame of timeFrames" [value]="frame.value">{{ frame.label }}</option>
+      </select>
+
+      <div class="view-toggle">
+        <button class="view-btn" [class.active]="viewMode === 'list'" (click)="switchToListView()">
+          📋 List
+        </button>
+        <button class="view-btn" [class.active]="viewMode === 'chart'" (click)="switchToChartView()">
+          📊 Charts
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="loading-spinner"></div>
+    <p>Loading category statistics...</p>
+  </div>
+
+  <!-- Main Content -->
+  <div *ngIf="!isLoading && stats" class="stats-content">
+
+    <!-- Summary Cards -->
+    <div *ngIf="viewMode === 'list' && !selectedCategory" class="summary-cards">
+      <div class="summary-card">
+        <div class="card-icon">💰</div>
+        <div class="card-content">
+          <h3>Total Revenue</h3>
+          <p class="amount">{{ formatCurrency(stats.summary.totalRevenue) }}</p>
+          <span class="card-label">Income across all categories</span>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon">💸</div>
+        <div class="card-content">
+          <h3>Total Expenses</h3>
+          <p class="amount">{{ formatCurrency(stats.summary.totalExpenses) }}</p>
+          <span class="card-label">Spending across all categories</span>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon">📊</div>
+        <div class="card-content">
+          <h3>Avg. Transaction</h3>
+          <p class="amount">{{ formatCurrency(stats.summary.averageTransaction) }}</p>
+          <span class="card-label">Average amount per transaction</span>
+        </div>
+      </div>
+
+      <div class="summary-card highlight">
+        <div class="card-icon">🏆</div>
+        <div class="card-content">
+          <h3>Top Categories</h3>
+          <p class="amount">{{ stats.summary.mostSpentCategory }} / {{ stats.summary.mostRevenueCategory }}</p>
+          <span class="card-label">Most spent / Most revenue</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category Details View -->
+    <div *ngIf="viewMode === 'details' && selectedCategory" class="category-details">
+      <div class="details-header">
+        <button class="back-btn" (click)="goBackToList()">← Back to List</button>
+        <div class="category-title">
+          <span class="category-icon">{{ getCategoryIcon(selectedCategory.category) }}</span>
+          <h2>{{ selectedCategory.category }}</h2>
+          <span class="category-type" [class.expense]="selectedCategory.type === 'expense'" [class.revenue]="selectedCategory.type === 'revenue'">
+            {{ selectedCategory.type === 'expense' ? 'Expense' : 'Revenue' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="details-grid">
+        <div class="detail-card">
+          <div class="detail-label">Total Amount</div>
+          <div class="detail-value">{{ formatCurrency(selectedCategory.totalAmount) }}</div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-label">Transaction Count</div>
+          <div class="detail-value">{{ selectedCategory.transactionCount }}</div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-label">Average Amount</div>
+          <div class="detail-value">{{ formatCurrency(selectedCategory.averageAmount) }}</div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-label">Percentage</div>
+          <div class="detail-value">{{ formatPercentage(selectedCategory.percentage) }}</div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-label">Trend</div>
+          <div class="detail-value">
+            <span [class]="getTrendClass(selectedCategory.trend)">
+              {{ getTrendIcon(selectedCategory.trend) }} {{ selectedCategory.trendPercentage > 0 ? '+' : '' }}{{ formatPercentage(selectedCategory.trendPercentage) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-label">Category Impact</div>
+          <div class="detail-value">
+            <div class="impact-bar">
+              <div class="impact-fill" [style.width.%]="selectedCategory.percentage"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Trend -->
+      <div *ngIf="selectedCategory.monthlyData" class="monthly-trend">
+        <h3>Monthly Trend</h3>
+        <div class="trend-chart">
+          <div *ngFor="let month of selectedCategory.monthlyData" class="month-bar">
+            <div class="bar-label">{{ month.month }}</div>
+            <div class="bar-container">
+              <div class="bar-fill" [style.height.%]="getBarHeight(month.amount, selectedCategory.monthlyData)"></div>
+            </div>
+            <div class="bar-value">{{ formatCurrency(month.amount) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="details-actions">
+        <button class="btn-primary" (click)="viewTransactions(selectedCategory)">
+          View {{ selectedCategory.transactionCount }} Transactions
+        </button>
+      </div>
+    </div>
+
+    <!-- Charts View -->
+    <div *ngIf="viewMode === 'chart' && !selectedCategory" class="charts-view">
+      <div class="charts-grid">
+        <div class="chart-section">
+          <h3>Expense Categories Distribution</h3>
+          <div class="chart-container">
+            <svg class="simple-pie-chart" viewBox="0 0 200 200">
+              <ng-container *ngFor="let category of stats.expenseCategories; let i = index">
+                <path
+                  [attr.d]="getPieSlicePath(category, stats.expenseCategories, i)"
+                  [attr.fill]="getCategoryColor(category.category)"
+                  [attr.stroke]="'var(--bg-secondary, white)'"
+                  [attr.stroke-width]="2"
+                />
+              </ng-container>
+            </svg>
+            <div class="chart-legend">
+              <div *ngFor="let category of stats.expenseCategories" class="legend-item">
+                <span class="legend-color" [style.backgroundColor]="getCategoryColor(category.category)"></span>
+                <span class="legend-label">{{ category.category }}</span>
+                <span class="legend-value">{{ formatCurrency(category.totalAmount) }} ({{ formatPercentage(category.percentage) }})</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <h3>Revenue Sources Distribution</h3>
+          <div class="chart-container">
+            <svg class="simple-pie-chart" viewBox="0 0 200 200">
+              <ng-container *ngFor="let category of stats.revenueCategories; let i = index">
+                <path
+                  [attr.d]="getPieSlicePath(category, stats.revenueCategories, i)"
+                  [attr.fill]="getCategoryColor(category.category)"
+                  [attr.stroke]="'var(--bg-secondary, white)'"
+                  [attr.stroke-width]="2"
+                />
+              </ng-container>
+            </svg>
+            <div class="chart-legend">
+              <div *ngFor="let category of stats.revenueCategories" class="legend-item">
+                <span class="legend-color" [style.backgroundColor]="getCategoryColor(category.category)"></span>
+                <span class="legend-label">{{ category.category }}</span>
+                <span class="legend-value">{{ formatCurrency(category.totalAmount) }} ({{ formatPercentage(category.percentage) }})</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- List View -->
+    <div *ngIf="viewMode === 'list' && !selectedCategory" class="categories-list">
+      <!-- Expense Categories -->
+      <div class="category-section">
+        <div class="section-header">
+          <h2>Expense Categories</h2>
+          <span class="section-total">{{ formatCurrency(stats.summary.totalExpenses) }}</span>
+        </div>
+
+        <div class="categories-grid">
+          <div *ngFor="let category of stats.expenseCategories" class="category-card" (click)="selectCategory(category)">
+            <div class="category-card-header">
+              <span class="category-icon">{{ getCategoryIcon(category.category) }}</span>
+              <h3>{{ category.category }}</h3>
+              <span class="trend-indicator" [class]="getTrendClass(category.trend)">
+                {{ getTrendIcon(category.trend) }}
+              </span>
+            </div>
+
+            <div class="category-card-body">
+              <div class="amount-display">
+                <span class="amount">{{ formatCurrency(category.totalAmount) }}</span>
+                <span class="percentage">{{ formatPercentage(category.percentage) }}</span>
+              </div>
+
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div class="progress-fill expense-fill" [style.width.%]="category.percentage"></div>
+                </div>
+              </div>
+
+              <div class="category-stats">
+                <div class="stat-item">
+                  <span class="stat-label">Transactions</span>
+                  <span class="stat-value">{{ category.transactionCount }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Average</span>
+                  <span class="stat-value">{{ formatCurrency(category.averageAmount) }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Trend</span>
+                  <span class="stat-value" [class]="getTrendClass(category.trend)">
+                    {{ category.trendPercentage > 0 ? '+' : '' }}{{ formatPercentage(category.trendPercentage) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="category-card-footer">
+              <button class="btn-view" (click)="viewTransactions(category); $event.stopPropagation()">
+                View Transactions
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revenue Categories -->
+      <div class="category-section">
+        <div class="section-header">
+          <h2>Revenue Sources</h2>
+          <span class="section-total">{{ formatCurrency(stats.summary.totalRevenue) }}</span>
+        </div>
+
+        <div class="categories-grid">
+          <div *ngFor="let category of stats.revenueCategories" class="category-card" (click)="selectCategory(category)">
+            <div class="category-card-header">
+              <span class="category-icon">{{ getCategoryIcon(category.category) }}</span>
+              <h3>{{ category.category }}</h3>
+              <span class="trend-indicator" [class]="getTrendClass(category.trend)">
+                {{ getTrendIcon(category.trend) }}
+              </span>
+            </div>
+
+            <div class="category-card-body">
+              <div class="amount-display">
+                <span class="amount">{{ formatCurrency(category.totalAmount) }}</span>
+                <span class="percentage">{{ formatPercentage(category.percentage) }}</span>
+              </div>
+
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div class="progress-fill revenue-fill" [style.width.%]="category.percentage"></div>
+                </div>
+              </div>
+
+              <div class="category-stats">
+                <div class="stat-item">
+                  <span class="stat-label">Transactions</span>
+                  <span class="stat-value">{{ category.transactionCount }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Average</span>
+                  <span class="stat-value">{{ formatCurrency(category.averageAmount) }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Trend</span>
+                  <span class="stat-value" [class]="getTrendClass(category.trend)">
+                    {{ category.trendPercentage > 0 ? '+' : '' }}{{ formatPercentage(category.trendPercentage) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="category-card-footer">
+              <button class="btn-view" (click)="viewTransactions(category); $event.stopPropagation()">
+                View Transactions
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

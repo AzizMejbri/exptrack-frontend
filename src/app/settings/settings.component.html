@@ -1,0 +1,433 @@
+<!--settings.component.html-->
+<div class="settings-container">
+  <!-- Header -->
+  <header class="settings-header">
+    <h1>Settings</h1>
+    <p class="header-description">Customize your expense tracking experience</p>
+  </header>
+
+  <!-- Settings Navigation -->
+  <nav class="settings-nav">
+    <button class="nav-item" [class.active]="activeTab === 'general'" (click)="activeTab = 'general'">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">General</span>
+    </button>
+    <button class="nav-item" [class.active]="activeTab === 'budget'" (click)="activeTab = 'budget'">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">Budget</span>
+    </button>
+    <button class="nav-item" [class.active]="activeTab === 'export'" (click)="activeTab = 'export'">
+      <span class="nav-icon">📤</span>
+      <span class="nav-label">Export/Import</span>
+    </button>
+    <button class="nav-item" [class.active]="activeTab === 'account'" (click)="activeTab = 'account'">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">Account</span>
+    </button>
+  </nav>
+
+  <!-- Main Settings Content -->
+  <div class="settings-content">
+
+    <!-- General Settings -->
+    <div *ngIf="activeTab === 'general'" class="settings-section">
+      <h2 class="section-title">General Settings</h2>
+
+      <div class="settings-group">
+        <h3 class="group-title">Appearance</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Theme</h4>
+            <p>Switch between light and dark mode</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [checked]="isDarkMode" (change)="toggleTheme()">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">{{ isDarkMode ? 'Dark' : 'Light' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Preferences</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Currency</h4>
+            <p>Select your preferred currency</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="preferences.currency" (change)="onCurrencyChange()" class="select-control">
+              <option *ngFor="let currency of currencies" [value]="currency">{{ currency }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Date Format</h4>
+            <p>Choose how dates are displayed</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="preferences.dateFormat" class="select-control">
+              <option *ngFor="let format of dateFormats" [value]="format">{{ format }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Start of Week</h4>
+            <p>Set which day your week starts on</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="preferences.startOfWeek" class="select-control">
+              <option *ngFor="let day of weekStarts" [value]="day">{{ day }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Default Transaction Type</h4>
+            <p>Set default for new transactions</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="preferences.defaultTransactionType" class="select-control">
+              <option value="expense">Expense</option>
+              <option value="revenue">Revenue</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Notifications</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Enable Notifications</h4>
+            <p>Receive alerts for important updates</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="preferences.enableNotifications">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Budget Alerts</h4>
+            <p>Get notified when approaching budget limits</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="preferences.budgetAlerts">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" (click)="saveSettings()">Save Changes</button>
+      </div>
+    </div>
+
+    <!-- Budget Settings -->
+    <div *ngIf="activeTab === 'budget'" class="settings-section">
+      <h2 class="section-title">Budget Settings</h2>
+
+      <div class="budget-summary">
+        <div class="budget-card">
+          <div class="budget-icon">💰</div>
+          <div class="budget-info">
+            <h3>Monthly Budget</h3>
+            <p class="budget-amount">{{ budgetSettings.monthlyBudget | currency:preferences.currency }}</p>
+          </div>
+          <input type="number" [(ngModel)]="budgetSettings.monthlyBudget" class="budget-input" min="0">
+        </div>
+
+        <div class="budget-card">
+          <div class="budget-icon">📅</div>
+          <div class="budget-info">
+            <h3>Weekly Budget</h3>
+            <p class="budget-amount">{{ budgetSettings.weeklyBudget | currency:preferences.currency }}</p>
+          </div>
+          <input type="number" [(ngModel)]="budgetSettings.weeklyBudget" class="budget-input" min="0">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Budget Alerts</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Enable Budget Alerts</h4>
+            <p>Receive notifications when approaching budget limits</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="budgetSettings.enableBudgetAlerts">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item" *ngIf="budgetSettings.enableBudgetAlerts">
+          <div class="setting-info">
+            <h4>Alert Threshold</h4>
+            <p>Get alerted when spending reaches this percentage of budget</p>
+          </div>
+          <div class="setting-control">
+            <div class="range-control">
+              <input type="range" [(ngModel)]="budgetSettings.alertThreshold" min="50" max="100" step="5">
+              <span class="range-value">{{ budgetSettings.alertThreshold }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-header">
+          <h3 class="group-title">Category Budgets</h3>
+          <button class="btn-secondary" (click)="addBudgetCategory()">+ Add Category</button>
+        </div>
+
+        <div *ngFor="let category of budgetSettings.categories; let i = index" class="category-budget">
+          <div class="category-header">
+            <input type="text" [(ngModel)]="category.name" class="category-name" placeholder="Category name">
+            <button class="btn-icon" (click)="removeBudgetCategory(i)">🗑️</button>
+          </div>
+
+          <div class="budget-controls">
+            <div class="budget-input-group">
+              <label>Budget</label>
+              <input type="number" [(ngModel)]="category.budget" min="0" class="budget-input-small">
+            </div>
+            <div class="budget-input-group">
+              <label>Spent</label>
+              <input type="number" [(ngModel)]="category.spent" min="0" class="budget-input-small">
+            </div>
+          </div>
+
+          <div class="budget-progress">
+            <div class="progress-bar">
+              <div class="progress-fill"
+                   [class.over-budget]="getCategoryStatus(category) === 'over-budget'"
+                   [class.near-budget]="getCategoryStatus(category) === 'near-budget'"
+                   [style.width.%]="getSpentPercentage(category)"></div>
+            </div>
+            <span class="progress-text">{{ getSpentPercentage(category) | number:'1.0-0' }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" (click)="saveSettings()">Save Budget Settings</button>
+      </div>
+    </div>
+
+    <!-- Export/Import Settings -->
+    <div *ngIf="activeTab === 'export'" class="settings-section">
+      <h2 class="section-title">Data Management</h2>
+
+      <div class="settings-group">
+        <h3 class="group-title">Export Data</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Export Format</h4>
+            <p>Choose the format for exported data</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="exportOptions.format" class="select-control">
+              <option *ngFor="let format of exportFormats" [value]="format">{{ format }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Date Range</h4>
+            <p>Select which data to export</p>
+          </div>
+          <div class="setting-control">
+            <select [(ngModel)]="exportOptions.dateRange" class="select-control">
+              <option value="all">All Time</option>
+              <option value="year">This Year</option>
+              <option value="month">This Month</option>
+              <option value="week">This Week</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Include All Data</h4>
+            <p>Export transactions, categories, and settings</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="exportOptions.includeAllData">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Export Your Data</h4>
+            <p>Download a copy of your expense tracking data</p>
+          </div>
+          <button class="btn-primary" (click)="exportData()" [disabled]="isLoading">
+            {{ isLoading ? 'Exporting...' : 'Export Data' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Import Data</h3>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Import from File</h4>
+            <p>Restore your data from a backup file</p>
+          </div>
+          <div class="file-upload">
+            <input type="file" (change)="importData($event)" accept=".json,.csv,.xlsx" id="import-file" hidden>
+            <label for="import-file" class="btn-secondary">Choose File</label>
+            <span class="file-name">No file chosen</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Backup & Restore</h3>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Create Backup</h4>
+            <p>Save your current settings and data</p>
+          </div>
+          <button class="btn-secondary" (click)="backupData()">Backup Now</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Restore Backup</h4>
+            <p>Restore your settings from last backup</p>
+          </div>
+          <button class="btn-secondary" (click)="restoreData()">Restore Backup</button>
+        </div>
+      </div>
+
+      <div class="settings-group danger-zone">
+        <h3 class="group-title">⚠️ Danger Zone</h3>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Clear All Data</h4>
+            <p>Permanently delete all your transactions and settings</p>
+          </div>
+          <button class="btn-danger" (click)="clearAllData()">Clear All Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Account Settings -->
+    <div *ngIf="activeTab === 'account'" class="settings-section">
+      <h2 class="section-title">Account Settings</h2>
+
+      <div class="settings-group">
+        <h3 class="group-title">Profile Information</h3>
+
+        <div class="profile-card">
+          <div class="profile-picture">
+            <div class="avatar">
+              {{ userProfile.name.charAt(0) }}
+            </div>
+            <button class="btn-secondary">Change Picture</button>
+          </div>
+
+          <div class="profile-form">
+            <div class="form-group">
+              <label for="name">Full Name</label>
+              <input type="text" id="name" [(ngModel)]="userProfile.name" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email Address</label>
+              <input type="email" id="email" [(ngModel)]="userProfile.email" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Security</h3>
+
+        <div class="action-card">
+          <div class="action-info">
+            <h4>Change Password</h4>
+            <p>Update your account password</p>
+          </div>
+          <button class="btn-secondary" (click)="changePassword()">Change Password</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Biometric Login</h4>
+            <p>Use fingerprint or face recognition to login</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="preferences.biometricLogin">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="group-title">Sync & Storage</h3>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Auto Sync</h4>
+            <p>Automatically sync data across devices</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="preferences.autoSync">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h4>Save Transaction Automatically</h4>
+            <p>Save transaction immediately without confirmation</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="preferences.saveTransaction">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" (click)="saveSettings()">Save Account Settings</button>
+        <button class="btn-secondary" (click)="logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+</div>

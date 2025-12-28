@@ -1,0 +1,296 @@
+<!-- reports.component.html - Simplified and Clean -->
+<div class="reports-container">
+  <!-- Header -->
+  <header class="reports-header">
+    <div class="header-content">
+      <h1>Financial Reports</h1>
+      <p>Generate detailed financial reports and insights</p>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="controls-section">
+    <div class="report-type-selector">
+      <div *ngFor="let report of reportTypes"
+           class="report-type-btn"
+           [class.active]="selectedReport === report.id"
+           (click)="selectedReport = report.id; loadReport()">
+        <span class="report-icon">{{ report.icon }}</span>
+        {{ report.name }}
+      </div>
+    </div>
+
+    <div class="filters-section">
+      <div class="filter-group">
+        <label>Time Period</label>
+        <select [(ngModel)]="selectedPeriod" (change)="onPeriodChange()" class="filter-select">
+          <option *ngFor="let period of timePeriods" [value]="period.id">{{ period.name }}</option>
+        </select>
+      </div>
+
+      <div class="date-range-group" *ngIf="showCustomDateRange">
+        <div class="date-input-group">
+          <label>From</label>
+          <input type="date" [(ngModel)]="startDate" (change)="onDateRangeChange()" class="date-input">
+        </div>
+        <div class="date-input-group">
+          <label>To</label>
+          <input type="date" [(ngModel)]="endDate" (change)="onDateRangeChange()" class="date-input">
+        </div>
+      </div>
+
+      <div class="date-display" *ngIf="!showCustomDateRange">
+        <span>{{ startDate }} to {{ endDate }}</span>
+      </div>
+
+      <div class="export-controls">
+        <select [(ngModel)]="exportFormat" class="export-select">
+          <option value="json">💾 JSON</option>
+          <option value="csv">📊 CSV</option>
+        </select>
+        <button class="export-btn" (click)="exportReport()" [disabled]="isLoading">
+          📤 Export
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="loading-spinner"></div>
+    <p>Generating report...</p>
+  </div>
+
+  <!-- Report Content -->
+  <div *ngIf="!isLoading" class="report-content">
+
+    <!-- Expense Report -->
+    <div *ngIf="selectedReport === 'expense'" class="expense-report">
+      <div class="report-header">
+        <h2>Expense Report</h2>
+        <span class="report-period">{{ startDate }} to {{ endDate }}</span>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="summary-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value">{{ formatCurrency(getTotalExpenses()) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Average per Category</div>
+          <div class="stat-value">{{ formatCurrency(getAverageExpense()) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Transactions</div>
+          <div class="stat-value">{{ getTotalTransactions() }}</div>
+        </div>
+      </div>
+
+      <!-- Bar Chart -->
+      <div class="chart-section">
+        <h3>Expense Distribution</h3>
+        <div class="bar-chart-simple">
+          <div *ngFor="let item of expenseReport" class="bar-item">
+            <div class="bar-label">{{ item.category }}</div>
+            <div class="bar-wrapper">
+              <div class="bar-fill" [style.width.%]="item.percentage">
+                <span class="bar-amount">{{ formatCurrency(item.totalAmount) }}</span>
+              </div>
+              <span class="bar-percentage">{{ item.percentage.toFixed(1) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-section">
+        <h3>Detailed Breakdown</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Total</th>
+                <th>Transactions</th>
+                <th>Average</th>
+                <th>Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of expenseReport">
+                <td>{{ item.category }}</td>
+                <td>{{ formatCurrency(item.totalAmount) }}</td>
+                <td>{{ item.transactionCount }}</td>
+                <td>{{ formatCurrency(item.averageAmount) }}</td>
+                <td>{{ item.percentage.toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Income Statement -->
+    <div *ngIf="selectedReport === 'income'" class="income-report">
+      <div class="report-header">
+        <h2>Income Statement</h2>
+        <span class="report-period">{{ startDate }} to {{ endDate }}</span>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-grid">
+        <div class="stat-card revenue">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value">{{ formatCurrency(incomeStatement?.totalRevenue || 0) }}</div>
+        </div>
+        <div class="stat-card expense">
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value">{{ formatCurrency(incomeStatement?.totalExpenses || 0) }}</div>
+        </div>
+        <div class="stat-card net">
+          <div class="stat-label">Net Income</div>
+          <div class="stat-value">{{ formatCurrency(incomeStatement?.netIncome || 0) }}</div>
+        </div>
+        <div class="stat-card margin">
+          <div class="stat-label">Gross Margin</div>
+          <div class="stat-value">{{ incomeStatement?.grossMargin?.toFixed(1) || 0 }}%</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Revenue Sources</h3>
+          <div class="source-list">
+            <div *ngFor="let source of incomeStatement?.categories?.revenue || []" class="source-item">
+              <div class="source-info">
+                <span class="source-name">{{ source.name }}</span>
+                <span class="source-percentage">{{ source.percentage.toFixed(1) }}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill revenue-fill" [style.width.%]="source.percentage"></div>
+              </div>
+              <span class="source-amount">{{ formatCurrency(source.amount) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>Expense Allocation</h3>
+          <div class="expense-list">
+            <div *ngFor="let expense of incomeStatement?.categories?.expenses || []" class="expense-item">
+              <div class="expense-info">
+                <span class="expense-name">{{ expense.name }}</span>
+                <span class="expense-percentage">{{ expense.percentage.toFixed(1) }}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill expense-fill" [style.width.%]="expense.percentage"></div>
+              </div>
+              <span class="expense-amount">{{ formatCurrency(expense.amount) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trend Analysis -->
+    <div *ngIf="selectedReport === 'trend'" class="trend-report">
+      <div class="report-header">
+        <h2>Trend Analysis</h2>
+        <span class="report-period">{{ selectedPeriod }}</span>
+      </div>
+
+      <!-- Trend Chart -->
+      <div class="trend-chart-section">
+        <h3>Spending Trend</h3>
+        <div class="trend-chart-simple">
+          <div class="chart-bars">
+            <div *ngFor="let item of trendAnalysis" class="trend-bar">
+              <div class="bar-period">{{ item.period }}</div>
+              <div class="bar-amount" [style.height.%]="(item.totalAmount / getMaxTrendAmount()) * 100">
+                <span class="amount-label">{{ formatCurrency(item.totalAmount) }}</span>
+              </div>
+              <div class="trend-indicator" [class]="item.trend">
+                {{ getTrendIcon(item.trend) }} {{ item.percentageChange > 0 ? '+' : '' }}{{ item.percentageChange.toFixed(1) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="trend-summary">
+        <div class="trend-stat">
+          <span class="stat-label">Best Month</span>
+          <span class="stat-value">{{ getBestPeriod()?.period }} (+{{ getBestPeriod()?.percentageChange?.toFixed(1) || 0 }}%)</span>
+        </div>
+        <div class="trend-stat">
+          <span class="stat-label">Average Growth</span>
+          <span class="stat-value" [class]="getOverallTrend()">
+            {{ getOverallTrendIcon() }} {{ getAverageTrendChange().toFixed(1) }}%
+          </span>
+        </div>
+        <div class="trend-stat">
+          <span class="stat-label">Next Month Forecast</span>
+          <span class="stat-value">{{ formatCurrency(getForecast()) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Budget vs Actual -->
+    <div *ngIf="selectedReport === 'budget'" class="budget-report">
+      <div class="report-header">
+        <h2>Budget vs Actual</h2>
+        <span class="report-period">Current Month</span>
+      </div>
+
+      <div *ngIf="budgetVsActual" class="budget-content">
+        <!-- Summary -->
+        <div class="budget-summary">
+          <div class="budget-stat">
+            <span class="stat-label">Total Budget</span>
+            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.budget) }}</span>
+          </div>
+          <div class="budget-stat">
+            <span class="stat-label">Actual Spending</span>
+            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.actual) }}</span>
+          </div>
+          <div class="budget-stat" [class.over]="budgetVsActual.total.variance < 0">
+            <span class="stat-label">Variance</span>
+            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.variance) }}</span>
+            <span class="variance-percent">({{ budgetVsActual.total.variancePercent.toFixed(1) }}%)</span>
+          </div>
+        </div>
+
+        <!-- Category Table -->
+        <div class="budget-table-section">
+          <h3>Category Breakdown</h3>
+          <div class="budget-table">
+            <div class="table-header">
+              <div class="header-cell">Category</div>
+              <div class="header-cell">Budget</div>
+              <div class="header-cell">Actual</div>
+              <div class="header-cell">Variance</div>
+              <div class="header-cell">Progress</div>
+            </div>
+            <div *ngFor="let category of budgetVsActual.categories" class="table-row">
+              <div class="table-cell">{{ category.name }}</div>
+              <div class="table-cell">{{ formatCurrency(category.budget) }}</div>
+              <div class="table-cell">{{ formatCurrency(category.actual) }}</div>
+              <div class="table-cell" [class.over]="category.variance < 0">
+                {{ formatCurrency(category.variance) }}
+                <span class="cell-percent">({{ category.variancePercent.toFixed(1) }}%)</span>
+              </div>
+              <div class="table-cell">
+                <div class="progress-bar">
+                  <div class="progress-fill" [style.width.%]="(category.actual / category.budget) * 100"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

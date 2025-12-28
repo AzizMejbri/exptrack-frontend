@@ -1,0 +1,151 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="header-content">
+      <h1>Financial Dashboard</h1>
+      <div class="time-frame-selector">
+        <select [(ngModel)]="selectedTimeFrame" (change)="onTimeFrameChange()" class="time-select">
+          <option *ngFor="let frame of timeFrames" [value]="frame.value">{{ frame.label }}</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading; else contentTemplate" class="loading-state">
+    <div class="loading-spinner"></div>
+    <p>Loading your financial data...</p>
+  </div>
+
+  <!-- Main Content -->
+  <ng-template #contentTemplate>
+    <div *ngIf="summary" class="dashboard-content">
+
+      <!-- Summary Cards -->
+      <div class="summary-cards">
+        <div class="summary-card revenue-card">
+          <div class="card-icon">
+            <i class="icon-revenue">↑</i>
+          </div>
+          <div class="card-content">
+            <h3>Total Revenue</h3>
+            <p class="amount">{{ formatCurrency(summary.totalRevenue) }}</p>
+            <span class="card-label">Income</span>
+          </div>
+        </div>
+
+        <div class="summary-card expense-card">
+          <div class="card-icon">
+            <i class="icon-expense">↓</i>
+          </div>
+          <div class="card-content">
+            <h3>Total Expenses</h3>
+            <p class="amount">{{ formatCurrency(summary.totalExpenses) }}</p>
+            <span class="card-label">Spending</span>
+          </div>
+        </div>
+
+        <div class="summary-card net-card">
+          <div class="card-icon">
+            <i class="icon-net">$</i>
+          </div>
+          <div class="card-content">
+            <h3>Net Amount</h3>
+            <p class="amount" [class.positive]="summary.netAmount >= 0" [class.negative]="summary.netAmount < 0">
+              {{ formatCurrency(summary.netAmount) }}
+            </p>
+            <span class="card-label">Balance</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts and Details -->
+      <div class="charts-section">
+        <!-- Pie Chart -->
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3>Income vs Expenses</h3>
+          </div>
+          <div class="pie-chart-wrapper" *ngIf="summary.totalRevenue || summary.totalExpenses">
+            <canvas #pieChart></canvas>
+          </div>
+          <div *ngIf="!summary.totalRevenue && !summary.totalExpenses" class="no-data-message">
+            No data available for chart
+          </div>
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="category-breakdown">
+          <div class="expense-categories">
+            <h3>Expense Categories</h3>
+            <div *ngFor="let category of getExpenseCategories()" class="category-item">
+              <div class="category-info">
+                <span class="category-name">{{ category.category }}</span>
+                <span class="category-amount">{{ formatCurrency(category.amount) }}</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill expense-fill" [style.width.%]="category.percentage"></div>
+              </div>
+              <span class="percentage">{{ category.percentage.toFixed(1) }}%</span>
+            </div>
+            <div *ngIf="getExpenseCategories().length === 0" class="no-data-message">
+              No expense data available
+            </div>
+          </div>
+
+          <div class="revenue-categories">
+            <h3>Revenue Sources</h3>
+            <div *ngFor="let category of getRevenueCategories()" class="category-item">
+              <div class="category-info">
+                <span class="category-name">{{ category.category }}</span>
+                <span class="category-amount">{{ formatCurrency(category.amount) }}</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill revenue-fill" [style.width.%]="category.percentage"></div>
+              </div>
+              <span class="percentage">{{ category.percentage.toFixed(1) }}%</span>
+            </div>
+            <div *ngIf="getRevenueCategories().length === 0" class="no-data-message">
+              No revenue data available
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="recent-transactions">
+        <div class="section-header">
+          <h3>Recent Transactions</h3>
+          <button class="btn-primary" (click)="showFullTransactions()">View All</button>
+        </div>
+        <div class="transactions-list">
+          <div *ngFor="let transaction of transactions" class="transaction-item">
+            <div class="transaction-main">
+              <div class="transaction-icon" [class.expense]="transaction.type === 'expense'" [class.revenue]="transaction.type === 'revenue'">
+                {{ transaction.type === 'expense' ? '↓' : '↑' }}
+              </div>
+              <div class="transaction-details">
+                <span class="transaction-description">{{ transaction.description }}</span>
+                <span class="transaction-category">{{ transaction.category }}</span>
+              </div>
+            </div>
+            <div class="transaction-amount" [class.expense]="transaction.type === 'expense'" [class.revenue]="transaction.type === 'revenue'">
+              {{ transaction.type === 'expense' ? '-' : '+' }}{{ formatCurrency(transaction.amount) }}
+            </div>
+          </div>
+          <div *ngIf="transactions.length === 0" class="no-data-message">
+            No recent transactions
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Data State -->
+    <div *ngIf="!summary" class="no-data-state">
+      <div class="no-data-icon">📊</div>
+      <h3>No Financial Data Available</h3>
+      <p>Try selecting a different time frame or add some transactions.</p>
+      <button class="btn-primary" routerLink="/transactions/new">Add First Transaction</button>
+    </div>
+  </ng-template>
+</div>
