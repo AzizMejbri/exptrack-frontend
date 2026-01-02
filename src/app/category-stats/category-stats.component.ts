@@ -103,7 +103,12 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (data) => {
           this.stats = data;
-          console.warn(data);
+          console.warn('Full data:', data);
+          console.warn('Expense categories:', data.expenseCategories);
+          console.warn('First expense:', data.expenseCategories[0]);
+          console.warn('Second expense:', data.expenseCategories[1]);
+          console.warn('Revenue categories:', data.revenueCategories);
+          console.warn('First revenue:', data.revenueCategories[0]);
           this.isLoading = false;
         },
         error: (err) => {
@@ -200,6 +205,7 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
   }
 
   formatPercentage(p: number): string {
+    if (p == null || isNaN(p)) return '0.0%';
     return `${p.toFixed(1)}%`;
   }
 
@@ -207,6 +213,7 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
   // ICONS & COLORS
   // ===============================
   getCategoryIcon(category: string): string {
+    if (!category) return '📊';
     const icons: Record<string, string> = {
       Food: '🍔',
       Transport: '🚗',
@@ -226,15 +233,35 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
 
   getCategoryColor(category: string): string {
     const map: Record<string, string> = {
-      Food: '#ef4444',
-      Transport: '#f97316',
-      Entertainment: '#f59e0b',
-      Shopping: '#84cc16',
-      Bills: '#10b981',
-      Healthcare: '#0ea5e9',
-      Education: '#3b82f6',
-      Travel: '#8b5cf6',
-      Salary: '#059669'
+      // Food: '#ef4444',        // red
+      // Transport: '#f87171',   // light red
+      // Entertainment: '#fbbf24', // yellow-orange
+      // Bills: '#facc15',       // yellow
+      // Shopping: '#fde68a',    // pale yellow
+      // Healthcare: '#fcd34d',   // golden yellow
+      // Salary: '#16a34a',      // green
+      // Freelance: '#22c55e',   // lime-green
+      // Investment: '#7c3aed',  // purple
+      // Gift: '#a78bfa',        // light purple
+      // Other: '#6b7280'        // gr
+      Food: '#dc2626',        // deep red
+      Transport: '#ea580c',   // orange-red
+      Entertainment: '#f97316', // bright orange
+      Bills: '#f59e0b',       // amber
+      Shopping: '#eab308',    // yellow-gold
+      Healthcare: '#ca8a04',  // golden yellow
+      Education: '#a16207',   // dark yellow
+      Travel: '#854d0e',      // brown-yellow
+      Utilities: '#713f12',   // dark brown-yellow
+      Subscription: '#5c3c1c', // very dark yellow-brown
+
+      Salary: '#065f46',      // deep green
+      Freelance: '#059669',   // emerald green
+      Investment: '#0d9488',  // teal
+      Business: '#a855f7',        // purple
+      Gift: '#6366f1',       // indigo
+      Rental: '#8b5cf6',      // violet
+      Other: '#0891b2',    // cyan-blue
     };
     return map[category] ?? '#6b7280';
   }

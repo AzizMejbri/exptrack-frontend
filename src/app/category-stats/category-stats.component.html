@@ -230,7 +230,10 @@
               <div class="category-stats">
                 <div class="stat-item">
                   <span class="stat-label">Transactions</span>
-                  <span class="stat-value">{{ category.transactionCount }}</span>
+                  <span class="stat-value">
+                    {{ category.trendPercentage != null && category.trendPercentage > 0 ? '+' : '' }}
+                    {{ formatPercentage(category.trendPercentage) }}
+                  </span>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Average</span>
@@ -243,12 +246,6 @@
                   </span>
                 </div>
               </div>
-            </div>
-
-            <div class="category-card-footer">
-              <button class="btn-view" (click)="viewTransactions(category); $event.stopPropagation()">
-                View Transactions
-              </button>
             </div>
           </div>
         </div>
@@ -301,11 +298,6 @@
               </div>
             </div>
 
-            <div class="category-card-footer">
-              <button class="btn-view" (click)="viewTransactions(category); $event.stopPropagation()">
-                View Transactions
-              </button>
-            </div>
           </div>
         </div>
       </div>
