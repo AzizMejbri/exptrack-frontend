@@ -46,12 +46,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
   // State variables
   selectedReport = 'expense';
   selectedPeriod = 'currentMonth';
-  exportFormat = 'pdf';
+  exportFormat: 'pdf' | 'csv' | 'json' = 'pdf';
   startDate = '';
   endDate = '';
   isLoading = false;
   isDarkMode = false;
   showCustomDateRange = false;
+  hasError = false;
+  errorMessage = '';
 
   // Report data
   expenseReport: ExpenseReport[] = [];
@@ -72,11 +74,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
+    console.log('📊 Reports component initialized');
+
     this.themeSubscription = this.themeService.isDarkMode$.subscribe(
       isDark => this.isDarkMode = isDark
     );
 
-    // Set default date range
     this.setDefaultDateRange();
     this.loadReport();
   }
@@ -109,6 +112,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     this.startDate = start.toISOString().split('T')[0];
     this.endDate = today.toISOString().split('T')[0];
+
+    console.log('📅 Date range set:', { startDate: this.startDate, endDate: this.endDate });
   }
 
   onPeriodChange() {
@@ -128,7 +133,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   loadReport() {
+    console.log('📊 Loading report:', this.selectedReport);
     this.isLoading = true;
+    this.hasError = false;
+    this.errorMessage = '';
 
     switch (this.selectedReport) {
       case 'expense':
@@ -149,32 +157,48 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   loadExpenseReport() {
+    console.log('💰 Loading expense report:', { startDate: this.startDate, endDate: this.endDate });
+
     this.transactionService.getExpenseReport(this.startDate, this.endDate).subscribe({
       next: (data) => {
-        this.expenseReport = data;
+        console.log('✅ Expense report loaded:', data);
+        this.expenseReport = data || [];
         this.prepareExpenseChartData();
         this.isLoading = false;
+
+        if (this.expenseReport.length === 0) {
+          this.errorMessage = 'No expense data available for the selected period.';
+        }
       },
       error: (error) => {
-        console.error('Error loading expense report:', error);
-        this.expenseReport = this.getMockExpenseData();
-        this.prepareExpenseChartData();
+        console.error('❌ Error loading expense report:', error);
+        this.expenseReport = [];
+        this.hasError = true;
+        this.errorMessage = 'Failed to load expense report. Please try again.';
         this.isLoading = false;
       }
     });
   }
 
   loadIncomeStatement() {
+    console.log('📊 Loading income statement:', { startDate: this.startDate, endDate: this.endDate });
+
     this.transactionService.getIncomeStatement(this.startDate, this.endDate).subscribe({
       next: (data) => {
+        console.log('✅ Income statement loaded:', data);
         this.incomeStatement = data;
         this.prepareIncomeChartData();
         this.isLoading = false;
+
+        if (!data || (data.totalExpenses === 0 && data.totalRevenue === 0)) {
+          this.errorMessage = 'No income data available for the selected period.';
+        }
       },
       error: (error) => {
-        console.error('Error loading income statement:', error);
-        this.incomeStatement = this.getMockIncomeData();
-        this.prepareIncomeChartData();
+        console.error('❌ Error loading income statement:', error);
+        this.incomeStatement = null;
+        this.hasError = true;
+        this.errorMessage = 'Failed to load income statement. Please try again.';
         this.isLoading = false;
       }
     });
@@ -184,30 +208,47 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const timeFrame = this.selectedPeriod.includes('Month') ? 'monthly' :
       this.selectedPeriod.includes('Quarter') ? 'quarterly' : 'yearly';
 
+    console.log('📈 Loading trend analysis:', timeFrame);
+
     this.transactionService.getTrendAnalysis(timeFrame).subscribe({
       next: (data) => {
-        this.trendAnalysis = data;
+        console.log('✅ Trend analysis loaded:', data);
+        this.trendAnalysis = data || [];
         this.prepareTrendChartData();
         this.isLoading = false;
+
+        if (this.trendAnalysis.length === 0) {
+          this.errorMessage = 'No trend data available for the selected period.';
+        }
       },
       error: (error) => {
-        console.error('Error loading trend analysis:', error);
-        this.trendAnalysis = this.getMockTrendData();
-        this.prepareTrendChartData();
+        console.error('❌ Error loading trend analysis:', error);
+        this.trendAnalysis = [];
+        this.hasError = true;
+        this.errorMessage = 'Failed to load trend analysis. Please try again.';
         this.isLoading = false;
       }
     });
   }
 
   loadBudgetVsActual() {
+    console.log('🎯 Loading budget vs actual');
+
     this.transactionService.getBudgetVsActual().subscribe({
       next: (data) => {
+        console.log('✅ Budget vs actual loaded:', data);
         this.budgetVsActual = data;
         this.isLoading = false;
+
+        if (!data || (data.categories && data.categories.length === 0)) {
+          this.errorMessage = 'No budget data available.';
+        }
       },
       error: (error) => {
-        console.error('Error loading budget vs actual:', error);
-        this.budgetVsActual = this.getMockBudgetData();
+        console.error('❌ Error loading budget vs actual:', error);
+        this.budgetVsActual = null;
+        this.hasError = true;
+        this.errorMessage = 'Failed to load budget comparison. Please try again.';
         this.isLoading = false;
       }
     });
@@ -219,10 +260,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
       value: item.totalAmount,
       percentage: item.percentage
     }));
+    console.log('📊 Expense chart data prepared:', this.expenseChartData);
   }
 
   prepareIncomeChartData() {
-    if (!this.incomeStatement) return;
+    if (!this.incomeStatement) {
+      console.warn('⚠️ No income statement data for chart');
+      return;
+    }
 
     this.incomeChartData = {
       revenue: this.incomeStatement.categories.revenue.map(item => ({
@@ -236,6 +281,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
         percentage: item.percentage
       }))
     };
+    console.log('📊 Income chart data prepared:', this.incomeChartData);
   }
 
   prepareTrendChartData() {
@@ -245,33 +291,56 @@ export class ReportsComponent implements OnInit, OnDestroy {
       change: item.percentageChange,
       trend: item.trend
     }));
+    console.log('📊 Trend chart data prepared:', this.trendChartData);
   }
 
   exportReport() {
+    console.log('📥 Exporting report:', {
+      format: this.exportFormat,
+      type: this.selectedReport
+    });
+
     this.isLoading = true;
 
-    // Create report data with proper types
     const reportData: ReportData = {
-      type: 'all', // Since we're using mock data, we'll just use 'all'
+      type: this.getReportType(),
       startDate: this.startDate,
       endDate: this.endDate,
-      format: 'json' as 'pdf' | 'csv' | 'json' // Cast to the correct type
+      format: this.exportFormat
     };
+
+    console.log('📋 Report data:', reportData);
 
     this.transactionService.generateReport(reportData).subscribe({
       next: (blob) => {
+        console.log('✅ Report generated, downloading...');
         const filename = this.getExportFilename();
         saveAs(blob, filename);
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error exporting report:', error);
+        console.error('❌ Error exporting report:', error);
         this.isLoading = false;
-        // Fallback: Download as JSON
+        this.hasError = true;
+        this.errorMessage = 'Failed to export report. Downloading as JSON fallback.';
         this.downloadAsJSON();
       }
     });
   }
+
+  getReportType(): 'expense' | 'revenue' | 'all' {
+    switch (this.selectedReport) {
+      case 'expense':
+        return 'expense';
+      case 'income':
+      case 'trend':
+      case 'budget':
+        return 'all';
+      default:
+        return 'all';
+    }
+  }
+
   getExportFilename(): string {
     const date = new Date().toISOString().split('T')[0];
     const reportName = this.reportTypes.find(r => r.id === this.selectedReport)?.name || 'Report';
@@ -281,7 +350,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   downloadAsJSON() {
     const data = this.getCurrentReportData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const filename = this.getExportFilename();
+    const filename = this.getExportFilename().replace(/\.(pdf|csv|excel)$/, '.json');
     saveAs(blob, filename);
   }
 
@@ -292,6 +361,11 @@ export class ReportsComponent implements OnInit, OnDestroy {
           reportType: 'Expense Report',
           period: `${this.startDate} to ${this.endDate}`,
           data: this.expenseReport,
+          summary: {
+            totalExpenses: this.getTotalExpenses(),
+            averageExpense: this.getAverageExpense(),
+            totalTransactions: this.getTotalTransactions()
+          },
           generatedAt: new Date().toISOString()
         };
       case 'income':
@@ -306,11 +380,30 @@ export class ReportsComponent implements OnInit, OnDestroy {
           reportType: 'Trend Analysis',
           period: this.selectedPeriod,
           data: this.trendAnalysis,
+          summary: {
+            overallTrend: this.getOverallTrend(),
+            averageChange: this.getAverageTrendChange(),
+            forecast: this.getForecast()
+          },
+          generatedAt: new Date().toISOString()
+        };
+      case 'budget':
+        return {
+          reportType: 'Budget vs Actual',
+          data: this.budgetVsActual,
           generatedAt: new Date().toISOString()
         };
       default:
-        return { message: 'No data available' };
+        return {
+          message: 'No data available',
+          generatedAt: new Date().toISOString()
+        };
     }
+  }
+
+  retryLoad(): void {
+    console.log('🔄 Retrying report load...');
+    this.loadReport();
   }
 
   formatCurrency(amount: number): string {
@@ -353,98 +446,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     }[trend] || '📊';
   }
 
-  // Mock data methods (for development)
-  private getMockExpenseData(): ExpenseReport[] {
-    return [
-      {
-        category: 'Food',
-        totalAmount: 1250.50,
-        transactionCount: 45,
-        averageAmount: 27.79,
-        percentage: 32.5,
-        monthlyBreakdown: [
-          { month: 'Jan', amount: 400, percentage: 32 },
-          { month: 'Feb', amount: 425, percentage: 34 },
-          { month: 'Mar', amount: 425.5, percentage: 34 }
-        ]
-      },
-      {
-        category: 'Transport',
-        totalAmount: 850.75,
-        transactionCount: 22,
-        averageAmount: 38.67,
-        percentage: 22.1,
-        monthlyBreakdown: [
-          { month: 'Jan', amount: 280, percentage: 33 },
-          { month: 'Feb', amount: 285, percentage: 33.5 },
-          { month: 'Mar', amount: 285.75, percentage: 33.5 }
-        ]
-      },
-      {
-        category: 'Entertainment',
-        totalAmount: 620.25,
-        transactionCount: 15,
-        averageAmount: 41.35,
-        percentage: 16.1,
-        monthlyBreakdown: [
-          { month: 'Jan', amount: 200, percentage: 32.2 },
-          { month: 'Feb', amount: 210, percentage: 33.9 },
-          { month: 'Mar', amount: 210.25, percentage: 33.9 }
-        ]
-      }
-    ];
-  }
-
-  private getMockIncomeData(): IncomeStatement {
-    return {
-      totalRevenue: 12500,
-      totalExpenses: 3860,
-      netIncome: 8640,
-      grossMargin: 69.1,
-      categories: {
-        revenue: [
-          { name: 'Salary', amount: 10000, percentage: 80 },
-          { name: 'Freelance', amount: 2000, percentage: 16 },
-          { name: 'Investments', amount: 500, percentage: 4 }
-        ],
-        expenses: [
-          { name: 'Food', amount: 1250, percentage: 32.4 },
-          { name: 'Transport', amount: 850, percentage: 22 },
-          { name: 'Entertainment', amount: 620, percentage: 16.1 },
-          { name: 'Bills', amount: 1140, percentage: 29.5 }
-        ]
-      }
-    };
-  }
-
-  private getMockTrendData(): TrendAnalysis[] {
-    return [
-      { period: 'Jan', totalAmount: 3200, percentageChange: 5.2, trend: 'up' },
-      { period: 'Feb', totalAmount: 3450, percentageChange: 7.8, trend: 'up' },
-      { period: 'Mar', totalAmount: 3860, percentageChange: 11.9, trend: 'up' },
-      { period: 'Apr', totalAmount: 3650, percentageChange: -5.4, trend: 'down' },
-      { period: 'May', totalAmount: 3820, percentageChange: 4.7, trend: 'up' },
-      { period: 'Jun', totalAmount: 3950, percentageChange: 3.4, trend: 'up' }
-    ];
-  }
-
-  private getMockBudgetData(): any {
-    return {
-      categories: [
-        { name: 'Food', budget: 1200, actual: 1250, variance: -50, variancePercent: -4.2 },
-        { name: 'Transport', budget: 800, actual: 850, variance: -50, variancePercent: -6.3 },
-        { name: 'Entertainment', budget: 600, actual: 620, variance: -20, variancePercent: -3.3 },
-        { name: 'Bills', budget: 1100, actual: 1140, variance: -40, variancePercent: -3.6 }
-      ],
-      total: {
-        budget: 3700,
-        actual: 3860,
-        variance: -160,
-        variancePercent: -4.3
-      }
-    };
-  }
-  // Add to reports.component.ts
   getTotalExpenses(): number {
     return this.expenseReport.reduce((sum, item) => sum + item.totalAmount, 0);
   }
@@ -497,6 +498,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const avgGrowth = this.getAverageTrendChange();
     return last.totalAmount * (1 + avgGrowth / 100);
   }
+
   getRevenueCategories(): CategoryBreakdown[] {
     return this.incomeStatement?.categories?.revenue || [];
   }

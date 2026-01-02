@@ -21,10 +21,8 @@ export interface TransactionSummary {
 }
 
 export interface CategorySummary {
-  category: string;
+  name: string;
   amount: number;
-  type: 'expense' | 'revenue';
+  type: string;
   percentage: number;
-  count?: number;
-  color?: string;
 }

@@ -1,5 +1,5 @@
 <!-- reports.component.html - Simplified and Clean -->
-<div class="reports-container">
+<div class="reports-container" [class.dark-mode]="isDarkMode">
   <!-- Header -->
   <header class="reports-header">
     <div class="header-content">
@@ -45,8 +45,10 @@
 
       <div class="export-controls">
         <select [(ngModel)]="exportFormat" class="export-select">
+          <option value="pdf">📄 PDF</option>
           <option value="json">💾 JSON</option>
           <option value="csv">📊 CSV</option>
+
         </select>
         <button class="export-btn" (click)="exportReport()" [disabled]="isLoading">
           📤 Export

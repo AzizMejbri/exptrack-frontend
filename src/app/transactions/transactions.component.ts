@@ -90,6 +90,7 @@ export class TransactionsComponent implements OnInit {
       amount: this.newTransaction.amount,
       type: this.newTransaction.type,
       category: this.newTransaction.category,
+      source: this.newTransaction.category,
       description: this.newTransaction.description
     };
 
@@ -138,6 +139,7 @@ export class TransactionsComponent implements OnInit {
       amount: this.editingTransaction.amount,
       type: this.editingTransaction.type,
       category: this.editingTransaction.category,
+      source: this.editingTransaction.category,
       description: this.editingTransaction.description
     };
 

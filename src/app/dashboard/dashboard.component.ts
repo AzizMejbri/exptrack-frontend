@@ -9,8 +9,7 @@ import {
   TransactionSummary,
   CategorySummary
 } from '../models/transaction.model';
-import { Subscription, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import Chart from 'chart.js/auto';
 import { AuthService } from '../auth/auth';
 
@@ -35,12 +34,13 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   selectedTimeFrame = 'month';
   transactions: Transaction[] = [];
-  summary: TransactionSummary;
+  summary: TransactionSummary | null = null;
   categorySummary: CategorySummary[] = [];
   isLoading = true;
   isDarkMode = false;
   hasChartData = false;
-  isUsingMockData = false;
+  hasError = false;
+  errorMessage = '';
   private themeSubscription!: Subscription;
 
   constructor(
@@ -48,12 +48,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private themeService: ThemeService,
     private router: Router,
     private authService: AuthService
-  ) {
-    this.summary = this.getMockSummary();
-  }
+  ) { }
 
   ngOnInit() {
-    // Debug logging
     console.log('🏠 Dashboard initialized');
     console.log('👤 Current User:', this.authService.getCurrentUser());
 
@@ -67,7 +64,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    // Wait a bit for view to render
     setTimeout(() => {
       this.updatePieChart();
     }, 100);
@@ -88,92 +84,73 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.isLoading = true;
     this.hasChartData = false;
-    this.isUsingMockData = false;
+    this.hasError = false;
+    this.errorMessage = '';
     let loaded = 0;
+    let failed = 0;
 
     const finish = () => {
       loaded++;
       console.log(`✔️ Loaded ${loaded}/3 data sources`);
       if (loaded === 3) {
         this.isLoading = false;
-        console.log('✅ All data loaded!');
-        console.log('📈 Final transactions:', this.transactions);
-        console.log('💰 Final summary:', this.summary);
-        console.log('📂 Final categories:', this.categorySummary);
-        console.log('🎭 Using mock data:', this.isUsingMockData);
-        setTimeout(() => this.updatePieChart(), 50);
+
+        if (failed === 3) {
+          this.hasError = true;
+          this.errorMessage = 'Failed to load dashboard data. Please try again.';
+          console.error('❌ All data sources failed to load');
+        } else {
+          console.log('✅ Dashboard data loaded successfully!');
+          console.log('📈 Final transactions:', this.transactions);
+          console.log('💰 Final summary:', this.summary);
+          console.log('📂 Final categories:', this.categorySummary);
+          setTimeout(() => this.updatePieChart(), 50);
+        }
       }
+    };
+
+    const handleError = (source: string, error: any) => {
+      console.error(`❌ ${source} failed:`, error);
+      failed++;
+      finish();
     };
 
     // Transactions
     this.transactionService.getTransactions(this.selectedTimeFrame, 5)
-      .pipe(catchError((error: any) => {
-        console.error('🔴 Transactions error:', error);
-        this.isUsingMockData = true;
-        return of([]);
-      }))
-      .subscribe((data: Transaction[]) => {
-        console.log('📥 Received transactions:', data);
-        console.log('📏 Data length:', data?.length);
-
-        if (!data || data.length === 0) {
-          console.log('⚠️ No transactions from backend, using mock data');
-          this.transactions = this.getMockTransactions();
-          this.isUsingMockData = true;
-        } else {
-          console.log('✅ Using real transactions from backend');
-          this.transactions = data;
-        }
-
-        finish();
+      .subscribe({
+        next: (data: Transaction[]) => {
+          console.log('📥 Received transactions:', data);
+          this.transactions = data || [];
+          finish();
+        },
+        error: (error) => handleError('Transactions', error)
       });
 
     // Summary
     this.transactionService.getTransactionSummary(this.selectedTimeFrame)
-      .pipe(catchError((error: any) => {
-        console.error('🔴 Summary error:', error);
-        this.isUsingMockData = true;
-        return of(this.getMockSummary());
-      }))
-      .subscribe((summary: TransactionSummary) => {
-        console.log('📥 Received summary:', summary);
-
-        const expenses = Number(summary?.totalExpenses) || 0;
-        const revenue = Number(summary?.totalRevenue) || 0;
-
-        if (expenses === 0 && revenue === 0) {
-          console.log('⚠️ Empty summary from backend, using mock data');
-          this.summary = this.getMockSummary();
-          this.isUsingMockData = true;
-        } else {
-          console.log('✅ Using real summary from backend');
+      .subscribe({
+        next: (summary: TransactionSummary) => {
+          console.log('📥 Received summary:', summary);
           this.summary = summary;
-          this.hasChartData = true;
-        }
 
-        finish();
+          const expenses = Number(summary?.totalExpenses) || 0;
+          const revenue = Number(summary?.totalRevenue) || 0;
+          this.hasChartData = (expenses > 0 || revenue > 0);
+
+          finish();
+        },
+        error: (error) => handleError('Summary', error)
       });
 
     // Categories
     this.transactionService.getCategorySummary(this.selectedTimeFrame)
-      .pipe(catchError((error: any) => {
-        console.error('🔴 Categories error:', error);
-        this.isUsingMockData = true;
-        return of(this.getMockCategories());
-      }))
-      .subscribe((data: CategorySummary[]) => {
-        console.log('📥 Received categories:', data);
-
-        if (!data || data.length === 0) {
-          console.log('⚠️ No categories from backend, using mock data');
-          this.categorySummary = this.getMockCategories();
-          this.isUsingMockData = true;
-        } else {
-          console.log('✅ Using real categories from backend');
-          this.categorySummary = data;
-        }
-
-        finish();
+      .subscribe({
+        next: (data: CategorySummary[]) => {
+          console.log('📥 Received categories:', data);
+          this.categorySummary = data || [];
+          finish();
+        },
+        error: (error) => handleError('Categories', error)
       });
   }
 
@@ -185,17 +162,20 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updatePieChart() {
-    // Destroy existing chart
     this.destroyChart();
 
-    // Check if we have data and canvas element
     if (!this.pieChartRef?.nativeElement) {
       console.warn('Canvas element not found');
       return;
     }
 
-    const revenue = Number(this.summary?.totalRevenue) || 0;
-    const expenses = Number(this.summary?.totalExpenses) || 0;
+    if (!this.summary) {
+      console.warn('No summary data available for chart');
+      return;
+    }
+
+    const revenue = Number(this.summary.totalRevenue) || 0;
+    const expenses = Number(this.summary.totalExpenses) || 0;
     const total = revenue + expenses;
 
     if (total <= 0) {
@@ -264,44 +244,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  /* --------------------- MOCK DATA --------------------- */
-  getMockTransactions(): Transaction[] {
-    return [
-      { id: '1', amount: 150, type: 'expense', category: 'Food', description: 'Lunch', createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', amount: 200, type: 'expense', category: 'Transport', description: 'Bus Pass', createdAt: new Date(), updatedAt: new Date() },
-      { id: '3', amount: 3000, type: 'revenue', category: 'Salary', description: 'Monthly Salary', createdAt: new Date(), updatedAt: new Date() },
-      { id: '4', amount: 75, type: 'expense', category: 'Entertainment', description: 'Movies', createdAt: new Date(), updatedAt: new Date() },
-      { id: '5', amount: 500, type: 'revenue', category: 'Freelance', description: 'Web Project', createdAt: new Date(), updatedAt: new Date() }
-    ];
-  }
-
-  getMockSummary(): TransactionSummary {
-    return {
-      totalExpenses: 425,
-      totalRevenue: 3500,
-      expenseCount: 3,
-      revenueCount: 2,
-      netAmount: 3075,
-      period: this.selectedTimeFrame,
-      currency: 'USD',
-    };
-  }
-
-  getMockCategories(): CategorySummary[] {
-    return [
-      { category: 'Food', amount: 150, type: 'expense', percentage: 35.3 },
-      { category: 'Transport', amount: 200, type: 'expense', percentage: 47.1 },
-      { category: 'Entertainment', amount: 75, type: 'expense', percentage: 17.6 },
-      { category: 'Salary', amount: 3000, type: 'revenue', percentage: 85.7 },
-      { category: 'Freelance', amount: 500, type: 'revenue', percentage: 14.3 }
-    ];
-  }
-
   formatCurrency(amount: number | null | undefined): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount ?? 0);
   }
 
   getExpenseCategories(): CategorySummary[] {
+    console.log(`${this.categorySummary}`);
     return this.categorySummary.filter((c: CategorySummary) => c.type === 'expense');
   }
 
@@ -315,5 +263,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   showFullTransactions(): void {
     this.router.navigate([`/transactions/${this.authService.getCurrentUser()?.id}`]);
+  }
+
+  retryLoad(): void {
+    this.loadDashboardData();
   }
 }
