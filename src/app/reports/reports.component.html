@@ -1,59 +1,81 @@
-<!-- reports.component.html - Simplified and Clean -->
+<!-- reports.component.html - Streamlined Version -->
 <div class="reports-container" [class.dark-mode]="isDarkMode">
   <!-- Header -->
   <header class="reports-header">
     <div class="header-content">
       <h1>Financial Reports</h1>
-      <p>Generate detailed financial reports and insights</p>
+      <p>Analyze trends and export custom financial reports</p>
     </div>
   </header>
 
+  <!-- Report Type Selector -->
+  <div class="report-selector-section">
+    <div class="report-cards">
+      <div *ngFor="let report of reportTypes"
+           class="report-card"
+           [class.active]="selectedReport === report.id"
+           (click)="selectedReport = report.id; onReportTypeChange()">
+        <div class="report-icon">{{ report.icon }}</div>
+        <div class="report-info">
+          <h3>{{ report.name }}</h3>
+          <p>{{ report.description }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Controls -->
   <div class="controls-section">
-    <div class="report-type-selector">
-      <div *ngFor="let report of reportTypes"
-           class="report-type-btn"
-           [class.active]="selectedReport === report.id"
-           (click)="selectedReport = report.id; loadReport()">
-        <span class="report-icon">{{ report.icon }}</span>
-        {{ report.name }}
+    <!-- Trend Analysis Controls -->
+    <div *ngIf="selectedReport === 'trend'" class="trend-controls">
+      <div class="control-group">
+        <label>Time Period</label>
+        <select [(ngModel)]="selectedTrendPeriod"
+                (change)="onTrendPeriodChange()"
+                class="control-select">
+          <option *ngFor="let period of trendPeriods" [value]="period.id">
+            {{ period.name }}
+          </option>
+        </select>
       </div>
     </div>
 
-    <div class="filters-section">
-      <div class="filter-group">
-        <label>Time Period</label>
-        <select [(ngModel)]="selectedPeriod" (change)="onPeriodChange()" class="filter-select">
-          <option *ngFor="let period of timePeriods" [value]="period.id">{{ period.name }}</option>
+    <!-- Custom Report Controls -->
+    <div *ngIf="selectedReport === 'custom'" class="custom-controls">
+      <div class="control-group">
+        <label>From Date</label>
+        <input type="date"
+               [(ngModel)]="startDate"
+               (change)="onDateRangeChange()"
+               class="control-input">
+      </div>
+
+      <div class="control-group">
+        <label>To Date</label>
+        <input type="date"
+               [(ngModel)]="endDate"
+               (change)="onDateRangeChange()"
+               class="control-input">
+      </div>
+    </div>
+
+    <!-- Export Controls -->
+    <div class="export-section">
+      <div class="control-group">
+        <label>Export Format</label>
+        <select [(ngModel)]="exportFormat" class="control-select">
+          <option *ngFor="let format of exportFormats" [value]="format.id">
+            {{ format.icon }} {{ format.name }}
+          </option>
         </select>
       </div>
 
-      <div class="date-range-group" *ngIf="showCustomDateRange">
-        <div class="date-input-group">
-          <label>From</label>
-          <input type="date" [(ngModel)]="startDate" (change)="onDateRangeChange()" class="date-input">
-        </div>
-        <div class="date-input-group">
-          <label>To</label>
-          <input type="date" [(ngModel)]="endDate" (change)="onDateRangeChange()" class="date-input">
-        </div>
-      </div>
-
-      <div class="date-display" *ngIf="!showCustomDateRange">
-        <span>{{ startDate }} to {{ endDate }}</span>
-      </div>
-
-      <div class="export-controls">
-        <select [(ngModel)]="exportFormat" class="export-select">
-          <option value="pdf">📄 PDF</option>
-          <option value="json">💾 JSON</option>
-          <option value="csv">📊 CSV</option>
-
-        </select>
-        <button class="export-btn" (click)="exportReport()" [disabled]="isLoading">
-          📤 Export
-        </button>
-      </div>
+      <button class="export-btn"
+              (click)="exportReport()"
+              [disabled]="isLoading">
+        <span class="btn-icon">📤</span>
+        <span>Export Report</span>
+      </button>
     </div>
   </div>
 
@@ -66,66 +88,106 @@
   <!-- Report Content -->
   <div *ngIf="!isLoading" class="report-content">
 
-    <!-- Expense Report -->
-    <div *ngIf="selectedReport === 'expense'" class="expense-report">
+    <!-- Trend Analysis Report -->
+    <div *ngIf="selectedReport === 'trend' && trendAnalysis.length > 0" class="trend-report">
       <div class="report-header">
-        <h2>Expense Report</h2>
-        <span class="report-period">{{ startDate }} to {{ endDate }}</span>
+        <div>
+          <h2>📈 Trend Analysis</h2>
+          <span class="report-subtitle">{{ selectedTrendPeriod }} view</span>
+        </div>
       </div>
 
-      <!-- Summary Cards -->
+      <!-- Trend Summary Cards -->
       <div class="summary-grid">
         <div class="stat-card">
-          <div class="stat-label">Total Expenses</div>
-          <div class="stat-value">{{ formatCurrency(getTotalExpenses()) }}</div>
+          <div class="stat-icon">📊</div>
+          <div class="stat-content">
+            <div class="stat-label">Overall Trend</div>
+            <div class="stat-value" [class]="getOverallTrend()">
+              {{ getOverallTrendIcon() }} {{ getOverallTrend() }}
+            </div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Average per Category</div>
-          <div class="stat-value">{{ formatCurrency(getAverageExpense()) }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Transactions</div>
-          <div class="stat-value">{{ getTotalTransactions() }}</div>
-        </div>
-      </div>
 
-      <!-- Bar Chart -->
-      <div class="chart-section">
-        <h3>Expense Distribution</h3>
-        <div class="bar-chart-simple">
-          <div *ngFor="let item of expenseReport" class="bar-item">
-            <div class="bar-label">{{ item.category }}</div>
-            <div class="bar-wrapper">
-              <div class="bar-fill" [style.width.%]="item.percentage">
-                <span class="bar-amount">{{ formatCurrency(item.totalAmount) }}</span>
-              </div>
-              <span class="bar-percentage">{{ item.percentage.toFixed(1) }}%</span>
+        <div class="stat-card">
+          <div class="stat-icon">📉</div>
+          <div class="stat-content">
+            <div class="stat-label">Average Change</div>
+            <div class="stat-value" [class]="getAverageTrendChange() >= 0 ? 'positive' : 'negative'">
+              {{ getAverageTrendChange() >= 0 ? '+' : '' }}{{ getAverageTrendChange().toFixed(1) }}%
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-content">
+            <div class="stat-label">Best Period</div>
+            <div class="stat-value">
+              {{ getBestPeriod()?.period || 'N/A' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">🔮</div>
+          <div class="stat-content">
+            <div class="stat-label">Next Period Forecast</div>
+            <div class="stat-value">
+              {{ formatCurrency(getForecast()) }}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Table -->
+      <!-- Trend Chart -->
+      <div class="chart-section">
+        <h3>Spending Trend Over Time</h3>
+        <div class="trend-chart">
+          <div class="chart-bars">
+            <div *ngFor="let item of trendAnalysis" class="trend-bar-container">
+              <div class="bar-value">{{ formatCurrency(item.totalAmount) }}</div>
+              <div class="trend-bar"
+                   [style.height.%]="(item.totalAmount / getMaxTrendAmount()) * 100"
+                   [class.positive]="item.percentageChange >= 0"
+                   [class.negative]="item.percentageChange < 0">
+              </div>
+              <div class="bar-label">{{ item.period }}</div>
+              <div class="bar-change" [class]="item.trend">
+                {{ item.percentageChange > 0 ? '+' : '' }}{{ item.percentageChange.toFixed(1) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trend Table -->
       <div class="table-section">
         <h3>Detailed Breakdown</h3>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Category</th>
-                <th>Total</th>
-                <th>Transactions</th>
-                <th>Average</th>
-                <th>Percentage</th>
+                <th>Period</th>
+                <th>Total Amount</th>
+                <th>Change</th>
+                <th>Trend</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let item of expenseReport">
-                <td>{{ item.category }}</td>
+              <tr *ngFor="let item of trendAnalysis">
+                <td><strong>{{ item.period }}</strong></td>
                 <td>{{ formatCurrency(item.totalAmount) }}</td>
-                <td>{{ item.transactionCount }}</td>
-                <td>{{ formatCurrency(item.averageAmount) }}</td>
-                <td>{{ item.percentage.toFixed(1) }}%</td>
+                <td [class]="item.percentageChange >= 0 ? 'positive' : 'negative'">
+                  {{ item.percentageChange > 0 ? '+' : '' }}{{ item.percentageChange.toFixed(1) }}%
+                </td>
+                <td>{{ getTrendIcon(item.trend) }} {{ item.trend }}</td>
+                <td>
+                  <span class="status-badge" [class]="item.trend">
+                    {{ item.trend }}
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -133,166 +195,144 @@
       </div>
     </div>
 
-    <!-- Income Statement -->
-    <div *ngIf="selectedReport === 'income'" class="income-report">
+    <!-- Custom Report -->
+    <div *ngIf="selectedReport === 'custom' && customReportData" class="custom-report">
       <div class="report-header">
-        <h2>Income Statement</h2>
-        <span class="report-period">{{ startDate }} to {{ endDate }}</span>
+        <div>
+          <h2>📋 Custom Financial Report</h2>
+          <span class="report-subtitle">{{ customReportData.summary.period }}</span>
+        </div>
       </div>
 
-      <!-- Summary -->
+      <!-- Summary Cards -->
       <div class="summary-grid">
         <div class="stat-card revenue">
-          <div class="stat-label">Total Revenue</div>
-          <div class="stat-value">{{ formatCurrency(incomeStatement?.totalRevenue || 0) }}</div>
+          <div class="stat-icon">💰</div>
+          <div class="stat-content">
+            <div class="stat-label">Total Revenues</div>
+            <div class="stat-value positive">
+              {{ formatCurrency(customReportData.summary.totalRevenues) }}
+            </div>
+            <div class="stat-meta">{{ customReportData.revenues.length }} transactions</div>
+          </div>
         </div>
+
         <div class="stat-card expense">
-          <div class="stat-label">Total Expenses</div>
-          <div class="stat-value">{{ formatCurrency(incomeStatement?.totalExpenses || 0) }}</div>
+          <div class="stat-icon">💸</div>
+          <div class="stat-content">
+            <div class="stat-label">Total Expenses</div>
+            <div class="stat-value negative">
+              {{ formatCurrency(customReportData.summary.totalExpenses) }}
+            </div>
+            <div class="stat-meta">{{ customReportData.expenses.length }} transactions</div>
+          </div>
         </div>
+
         <div class="stat-card net">
-          <div class="stat-label">Net Income</div>
-          <div class="stat-value">{{ formatCurrency(incomeStatement?.netIncome || 0) }}</div>
-        </div>
-        <div class="stat-card margin">
-          <div class="stat-label">Gross Margin</div>
-          <div class="stat-value">{{ incomeStatement?.grossMargin?.toFixed(1) || 0 }}%</div>
+          <div class="stat-icon">📊</div>
+          <div class="stat-content">
+            <div class="stat-label">Net Income</div>
+            <div class="stat-value"
+                 [class]="customReportData.summary.netIncome >= 0 ? 'positive' : 'negative'">
+              {{ formatCurrency(customReportData.summary.netIncome) }}
+            </div>
+            <div class="stat-meta">
+              {{ customReportData.summary.netIncome >= 0 ? 'Profit' : 'Loss' }}
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Charts -->
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Revenue Sources</h3>
-          <div class="source-list">
-            <div *ngFor="let source of incomeStatement?.categories?.revenue || []" class="source-item">
-              <div class="source-info">
-                <span class="source-name">{{ source.name }}</span>
-                <span class="source-percentage">{{ source.percentage.toFixed(1) }}%</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill revenue-fill" [style.width.%]="source.percentage"></div>
-              </div>
-              <span class="source-amount">{{ formatCurrency(source.amount) }}</span>
-            </div>
-          </div>
+      <!-- Revenue Table -->
+      <div class="table-section" *ngIf="customReportData.revenues.length > 0">
+        <div class="section-header">
+          <h3>💰 Revenue Transactions</h3>
+          <span class="section-count">{{ customReportData.revenues.length }} transactions</span>
         </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th class="amount-col">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let revenue of customReportData.revenues">
+                <td class="date-col">{{ revenue.date }}</td>
+                <td><span class="category-badge revenue">{{ revenue.category }}</span></td>
+                <td class="description-col">{{ revenue.description }}</td>
+                <td class="positive amount-col"><strong>{{ formatCurrency(revenue.amount) }}</strong></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="3"><strong>Total Revenues</strong></td>
+                <td class="positive amount-col"><strong>{{ formatCurrency(customReportData.summary.totalRevenues) }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
 
-        <div class="chart-card">
-          <h3>Expense Allocation</h3>
-          <div class="expense-list">
-            <div *ngFor="let expense of incomeStatement?.categories?.expenses || []" class="expense-item">
-              <div class="expense-info">
-                <span class="expense-name">{{ expense.name }}</span>
-                <span class="expense-percentage">{{ expense.percentage.toFixed(1) }}%</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill expense-fill" [style.width.%]="expense.percentage"></div>
-              </div>
-              <span class="expense-amount">{{ formatCurrency(expense.amount) }}</span>
-            </div>
-          </div>
+      <!-- Expense Table -->
+      <div class="table-section" *ngIf="customReportData.expenses.length > 0">
+        <div class="section-header">
+          <h3>💸 Expense Transactions</h3>
+          <span class="section-count">{{ customReportData.expenses.length }} transactions</span>
         </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th class="amount-col">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let expense of customReportData.expenses">
+                <td class="date-col">{{ expense.date }}</td>
+                <td><span class="category-badge expense">{{ expense.category }}</span></td>
+                <td class="description-col">{{ expense.description }}</td>
+                <td class="negative amount-col"><strong>{{ formatCurrency(expense.amount) }}</strong></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="3"><strong>Total Expenses</strong></td>
+                <td class="negative amount-col"><strong>{{ formatCurrency(customReportData.summary.totalExpenses) }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="customReportData.revenues.length === 0 && customReportData.expenses.length === 0"
+           class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3>No Transactions Found</h3>
+        <p>There are no transactions in the selected date range.</p>
       </div>
     </div>
 
-    <!-- Trend Analysis -->
-    <div *ngIf="selectedReport === 'trend'" class="trend-report">
-      <div class="report-header">
-        <h2>Trend Analysis</h2>
-        <span class="report-period">{{ selectedPeriod }}</span>
-      </div>
-
-      <!-- Trend Chart -->
-      <div class="trend-chart-section">
-        <h3>Spending Trend</h3>
-        <div class="trend-chart-simple">
-          <div class="chart-bars">
-            <div *ngFor="let item of trendAnalysis" class="trend-bar">
-              <div class="bar-period">{{ item.period }}</div>
-              <div class="bar-amount" [style.height.%]="(item.totalAmount / getMaxTrendAmount()) * 100">
-                <span class="amount-label">{{ formatCurrency(item.totalAmount) }}</span>
-              </div>
-              <div class="trend-indicator" [class]="item.trend">
-                {{ getTrendIcon(item.trend) }} {{ item.percentageChange > 0 ? '+' : '' }}{{ item.percentageChange.toFixed(1) }}%
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Summary -->
-      <div class="trend-summary">
-        <div class="trend-stat">
-          <span class="stat-label">Best Month</span>
-          <span class="stat-value">{{ getBestPeriod()?.period }} (+{{ getBestPeriod()?.percentageChange?.toFixed(1) || 0 }}%)</span>
-        </div>
-        <div class="trend-stat">
-          <span class="stat-label">Average Growth</span>
-          <span class="stat-value" [class]="getOverallTrend()">
-            {{ getOverallTrendIcon() }} {{ getAverageTrendChange().toFixed(1) }}%
-          </span>
-        </div>
-        <div class="trend-stat">
-          <span class="stat-label">Next Month Forecast</span>
-          <span class="stat-value">{{ formatCurrency(getForecast()) }}</span>
-        </div>
-      </div>
+    <!-- Empty State for No Data -->
+    <div *ngIf="selectedReport === 'trend' && trendAnalysis.length === 0 && !isLoading"
+         class="empty-state">
+      <div class="empty-icon">📊</div>
+      <h3>No Trend Data Available</h3>
+      <p>Add some transactions to see trend analysis.</p>
     </div>
 
-    <!-- Budget vs Actual -->
-    <div *ngIf="selectedReport === 'budget'" class="budget-report">
-      <div class="report-header">
-        <h2>Budget vs Actual</h2>
-        <span class="report-period">Current Month</span>
-      </div>
-
-      <div *ngIf="budgetVsActual" class="budget-content">
-        <!-- Summary -->
-        <div class="budget-summary">
-          <div class="budget-stat">
-            <span class="stat-label">Total Budget</span>
-            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.budget) }}</span>
-          </div>
-          <div class="budget-stat">
-            <span class="stat-label">Actual Spending</span>
-            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.actual) }}</span>
-          </div>
-          <div class="budget-stat" [class.over]="budgetVsActual.total.variance < 0">
-            <span class="stat-label">Variance</span>
-            <span class="stat-value">{{ formatCurrency(budgetVsActual.total.variance) }}</span>
-            <span class="variance-percent">({{ budgetVsActual.total.variancePercent.toFixed(1) }}%)</span>
-          </div>
-        </div>
-
-        <!-- Category Table -->
-        <div class="budget-table-section">
-          <h3>Category Breakdown</h3>
-          <div class="budget-table">
-            <div class="table-header">
-              <div class="header-cell">Category</div>
-              <div class="header-cell">Budget</div>
-              <div class="header-cell">Actual</div>
-              <div class="header-cell">Variance</div>
-              <div class="header-cell">Progress</div>
-            </div>
-            <div *ngFor="let category of budgetVsActual.categories" class="table-row">
-              <div class="table-cell">{{ category.name }}</div>
-              <div class="table-cell">{{ formatCurrency(category.budget) }}</div>
-              <div class="table-cell">{{ formatCurrency(category.actual) }}</div>
-              <div class="table-cell" [class.over]="category.variance < 0">
-                {{ formatCurrency(category.variance) }}
-                <span class="cell-percent">({{ category.variancePercent.toFixed(1) }}%)</span>
-              </div>
-              <div class="table-cell">
-                <div class="progress-bar">
-                  <div class="progress-fill" [style.width.%]="(category.actual / category.budget) * 100"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div *ngIf="selectedReport === 'custom' && !customReportData && !isLoading"
+         class="empty-state">
+      <div class="empty-icon">📋</div>
+      <h3>Select Date Range</h3>
+      <p>Choose a start and end date to generate your custom report.</p>
     </div>
   </div>
 </div>
