@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
+import { environment } from '../../environments/environment.prod';
 
 export interface User {
   id: string;
@@ -23,7 +24,8 @@ export interface SignupCredentials {
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
-  private baseUrl = 'https://localhost:8443';
+  // private baseUrl = 'https://localhost:8443';
+  private baseUrl = environment.apiUrl;
 
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   currentUser$ = this.currentUserSubject.asObservable();

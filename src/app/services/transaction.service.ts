@@ -4,6 +4,7 @@ import { forkJoin, Observable, of, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { Transaction, TransactionSummary, CategorySummary } from '../models/transaction.model';
 import { AuthService } from '../auth/auth';
+import { environment } from '../../environments/environment.prod';
 
 // Define interfaces for reports
 export interface ReportData {
@@ -88,7 +89,8 @@ export interface CategoryStatsResponse {
   providedIn: 'root'
 })
 export class TransactionService {
-  private apiUrl = 'https://localhost:8443/api';
+  // private apiUrl = 'https://localhost:8443/api';
+  private apiUrl = environment.apiUrl;
   private userId: string | null = null;
 
   constructor(private http: HttpClient, private authService: AuthService) {
