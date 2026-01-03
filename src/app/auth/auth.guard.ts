@@ -31,7 +31,7 @@ export class AuthGuard implements CanActivate {
 
     // CASE 2: Try to fetch user from backend (for page refresh)
     console.log('AuthGuard: No user in memory, fetching from backend...');
-    return this.authService.fetchCurrentUser().pipe(
+    return this.authService.fetchCurrentUser()?.pipe(
       map(user => {
         console.log('AuthGuard: Fetched user successfully');
         return !!user; // Convert to boolean

@@ -1,12 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
 
 export interface User {
   id: string;
   username: string;
-  email: string;
 }
 
 export interface LoginCredentials {
@@ -30,7 +29,6 @@ export class AuthService {
   currentUser$ = this.currentUserSubject.asObservable();
 
   login(credentials: LoginCredentials): Observable<User> {
-    console.log("login Working");
     return this.http.post<User>(
       `${this.baseUrl}/auth/login`,
       credentials,
@@ -40,9 +38,7 @@ export class AuthService {
         const user: User = {
           id: response.id.toString(),
           username: response.username,
-          email: response.email
         };
-        console.log("Login successful, user:", user);
         this.currentUserSubject.next(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
       })
@@ -59,34 +55,10 @@ export class AuthService {
         const user: User = {
           id: response.id.toString(),
           username: response.username,
-          email: response.email
         };
         console.log("Signup successful, user:", user);
         this.currentUserSubject.next(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
-      })
-    );
-  }
-
-  // ADD THIS METHOD: Fetch current user from backend
-  fetchCurrentUser(): Observable<User> {
-    return this.http.get<User>(
-      `${this.baseUrl}/api/current-user`,
-      { withCredentials: true }
-    ).pipe(
-      tap(response => {
-        const user: User = {
-          id: response.id.toString(),
-          username: response.username,
-          email: response.email
-        };
-        console.log("Fetched current user:", user);
-        this.currentUserSubject.next(user);
-        localStorage.setItem('currentUser', JSON.stringify(user));
-      }),
-      catchError((error: HttpErrorResponse) => {
-        console.error('Failed to fetch current user:', error);
-        return of(null as any); // Return empty observable on error
       })
     );
   }
@@ -99,13 +71,25 @@ export class AuthService {
     ).subscribe(() => {
       this.currentUserSubject.next(null);
       localStorage.removeItem('currentUser');
+      console.log(this.currentUser$);
       this.router.navigate(['/login']);
     });
   }
 
+  /** Synchronous getter (cached) */
   getCurrentUser(): User | null {
-    const userStr = localStorage.getItem('currentUser');
-    return userStr ? JSON.parse(userStr) : null;
+    return this.currentUserSubject.value;
+  }
+
+  fetchCurrentUser(): Observable<User> {
+    return this.http.get<User>(`${this.baseUrl}/auth/me`, { withCredentials: true })
+      .pipe(
+        tap(user => this.currentUserSubject.next(user)),
+        catchError(() => {
+          this.currentUserSubject.next(null);
+          return of(null as any);
+        })
+      );
   }
 
   isAuthenticated(): boolean {

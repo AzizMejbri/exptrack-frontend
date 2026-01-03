@@ -1,5 +1,5 @@
-// header.component.ts
-import { Component, OnInit, OnDestroy } from '@angular/core';
+
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth/auth';
@@ -15,13 +15,11 @@ import { Subscription } from 'rxjs';
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   isDarkMode = false;
+  isDropdownOpen = false;
+
   private themeSubscription!: Subscription;
 
-  user = {
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: 'JD'
-  };
+  username = '';
 
   constructor(
     private authService: AuthService,
@@ -30,14 +28,22 @@ export class HeaderComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    // Subscribe to theme changes
     this.themeSubscription = this.themeService.isDarkMode$.subscribe(
-      isDark => this.isDarkMode = isDark
+      isDark => (this.isDarkMode = isDark)
     );
+
+    // 🔹 Get authenticated user
+    const user = this.authService.getCurrentUser();
+    this.username = user?.username ?? 'User';
   }
 
   toggleDarkMode() {
     this.themeService.toggleTheme();
+  }
+
+  toggleDropdown(event: MouseEvent) {
+    event.stopPropagation();
+    this.isDropdownOpen = !this.isDropdownOpen;
   }
 
   logout() {
@@ -45,13 +51,16 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.router.navigate(['/login']);
   }
 
-  viewProfile() {
-    console.log('Navigate to profile');
+  // 🔹 Close dropdown when clicking outside
+  @HostListener('document:click', ['$event'])
+  closeOnOutsideClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.user-menu')) {
+      this.isDropdownOpen = false;
+    }
   }
 
   ngOnDestroy() {
-    if (this.themeSubscription) {
-      this.themeSubscription.unsubscribe();
-    }
+    this.themeSubscription?.unsubscribe();
   }
 }

@@ -140,27 +140,6 @@
         </div>
       </div>
 
-      <!-- Trend Chart -->
-      <div class="chart-section">
-        <h3>Spending Trend Over Time</h3>
-        <div class="trend-chart">
-          <div class="chart-bars">
-            <div *ngFor="let item of trendAnalysis" class="trend-bar-container">
-              <div class="bar-value">{{ formatCurrency(item.totalAmount) }}</div>
-              <div class="trend-bar"
-                   [style.height.%]="(item.totalAmount / getMaxTrendAmount()) * 100"
-                   [class.positive]="item.percentageChange >= 0"
-                   [class.negative]="item.percentageChange < 0">
-              </div>
-              <div class="bar-label">{{ item.period }}</div>
-              <div class="bar-change" [class]="item.trend">
-                {{ item.percentageChange > 0 ? '+' : '' }}{{ item.percentageChange.toFixed(1) }}%
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Trend Table -->
       <div class="table-section">
         <h3>Detailed Breakdown</h3>
@@ -310,25 +289,17 @@
           </table>
         </div>
       </div>
-
-      <!-- Empty State -->
-      <div *ngIf="customReportData.revenues.length === 0 && customReportData.expenses.length === 0"
-           class="empty-state">
-        <div class="empty-icon">📭</div>
-        <h3>No Transactions Found</h3>
-        <p>There are no transactions in the selected date range.</p>
-      </div>
     </div>
 
-    <!-- Empty State for No Data -->
-    <div *ngIf="selectedReport === 'trend' && trendAnalysis.length === 0 && !isLoading"
+    <!-- Empty States -->
+    <div *ngIf="selectedReport === 'trend' && trendAnalysis.length === 0"
          class="empty-state">
       <div class="empty-icon">📊</div>
       <h3>No Trend Data Available</h3>
       <p>Add some transactions to see trend analysis.</p>
     </div>
 
-    <div *ngIf="selectedReport === 'custom' && !customReportData && !isLoading"
+    <div *ngIf="selectedReport === 'custom' && !customReportData"
          class="empty-state">
       <div class="empty-icon">📋</div>
       <h3>Select Date Range</h3>

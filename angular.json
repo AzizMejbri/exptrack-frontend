@@ -37,20 +37,21 @@
             ],
             "styles": [
               "src/styles.scss"
-            ]
+            ],
+            "allowedCommonJsDependencies": ["filer-saver"]
           },
           "configurations": {
             "production": {
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "20kB",
+                  "maximumError": "50kB"
                 }
               ],
               "outputHashing": "all"
@@ -74,11 +75,15 @@
             }
           },
           "options": {
-            "sslKey": "localhost-key.pem",
-            "sslCert": "localhost-cert.pem",
+            "sslKey": "${FRONTEND_SSL_KEY}",
+            "sslCert": "${FRONTEND_SSL_CERT}",
             "ssl": true,
             "host": "localhost",
-            "port": 4200
+            "port": ${FRONTEND_PORT},
+            "allowedHosts": [
+              "*"
+            ]
+
           }
           "defaultConfiguration": "development"
         },

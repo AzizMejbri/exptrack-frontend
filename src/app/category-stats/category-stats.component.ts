@@ -1,4 +1,3 @@
-
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,6 +9,7 @@ import {
 } from '../services/transaction.service';
 import { ThemeService } from '../theme.service';
 import { Subscription } from 'rxjs';
+import { SettingsService } from '../services/settings.service';
 
 @Component({
   selector: 'app-category-stats',
@@ -19,7 +19,6 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./category-stats.component.scss']
 })
 export class CategoryStatsComponent implements OnInit, OnDestroy {
-
   timeFrames = [
     { value: 'day', label: 'Today' },
     { value: 'week', label: 'This Week' },
@@ -38,24 +37,60 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
   selectedCategory: CategoryDetail | null = null;
   viewMode: 'list' | 'chart' | 'details' = 'list';
 
+  // Settings properties
+  currentCurrency = 'USD';
+  currentDateFormat = 'MM/DD/YYYY';
+  appSettings: any;
+  budgetSettings: any;
+
   private themeSubscription!: Subscription;
+  private settingsSubscription!: Subscription;
 
   constructor(
     private transactionService: TransactionService,
     private themeService: ThemeService,
+    private settingsService: SettingsService,
     private router: Router
   ) { }
 
   ngOnInit(): void {
+    // Subscribe to theme changes
     this.themeSubscription = this.themeService.isDarkMode$.subscribe(
       isDark => this.isDarkMode = isDark
     );
+
+    // Subscribe to settings changes
+    this.settingsSubscription = this.settingsService.appSettings$.subscribe(
+      settings => {
+        this.appSettings = settings;
+        this.currentCurrency = settings.currency;
+        this.currentDateFormat = settings.dateFormat;
+        console.log('Category Stats - Settings updated:', settings);
+      }
+    );
+
+    // Subscribe to budget settings changes
+    this.settingsSubscription.add(
+      this.settingsService.budgetSettings$.subscribe(
+        settings => {
+          this.budgetSettings = settings;
+          console.log('Category Stats - Budget settings updated:', settings);
+        }
+      )
+    );
+
+    // Get initial settings
+    this.appSettings = this.settingsService.getAppSettings();
+    this.budgetSettings = this.settingsService.getBudgetSettings();
+    this.currentCurrency = this.appSettings.currency;
+    this.currentDateFormat = this.appSettings.dateFormat;
 
     this.loadCategoryStats();
   }
 
   ngOnDestroy(): void {
     this.themeSubscription?.unsubscribe();
+    this.settingsSubscription?.unsubscribe();
   }
 
   // ===============================
@@ -65,32 +100,6 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
     this.loadCategoryStats();
   }
 
-  //
-  // export interface CategoryDetail {
-  //   category: string;
-  //   type: 'expense' | 'revenue';
-  //   totalAmount: number;
-  //   transactionCount: number;
-  //   averageAmount: number;
-  //   percentage: number;
-  //   trend: 'up' | 'down' | 'stable';
-  //   trendPercentage: number;
-  //   monthlyData?: MonthlyData[];
-  // }
-  //
-  // export interface CategoryStatsResponse {
-  //   expenseCategories: CategoryDetail[];
-  //   revenueCategories: CategoryDetail[];
-  //   timeFrame: string;
-  //   summary: {
-  //     totalExpenses: number;
-  //     totalRevenue: number;
-  //     averageTransaction: number;
-  //     mostSpentCategory: string;
-  //     mostRevenueCategory: string;
-  //   };
-  // }
-  //
   loadCategoryStats(): void {
     this.isLoading = true;
     this.errorMessage = null;
@@ -103,12 +112,13 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (data) => {
           this.stats = data;
-          console.warn('Full data:', data);
-          console.warn('Expense categories:', data.expenseCategories);
-          console.warn('First expense:', data.expenseCategories[0]);
-          console.warn('Second expense:', data.expenseCategories[1]);
-          console.warn('Revenue categories:', data.revenueCategories);
-          console.warn('First revenue:', data.revenueCategories[0]);
+          console.log('Category Stats loaded:', {
+            timeframe: this.selectedTimeFrame,
+            currency: this.currentCurrency,
+            dateFormat: this.currentDateFormat,
+            expenseCategories: data.expenseCategories?.length || 0,
+            revenueCategories: data.revenueCategories?.length || 0
+          });
           this.isLoading = false;
         },
         error: (err) => {
@@ -194,19 +204,111 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
   }
 
   // ===============================
-  // FORMATTING
+  // FORMATTING METHODS
   // ===============================
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2
-    }).format(amount);
+    // Use the SettingsService for consistent currency formatting
+    return this.settingsService.formatCurrency(amount);
   }
 
   formatPercentage(p: number): string {
     if (p == null || isNaN(p)) return '0.0%';
     return `${p.toFixed(1)}%`;
+  }
+
+  // New method to format dates using SettingsService
+  formatDate(date: Date | string): string {
+    return this.settingsService.formatDate(date);
+  }
+
+  // Get currency symbol from settings
+  getCurrencySymbol(): string {
+    return this.settingsService.getCurrencySymbol();
+  }
+
+  // ===============================
+  // BUDGET-RELATED METHODS
+  // ===============================
+
+  // Get budget for a specific category
+  getCategoryBudget(categoryName: string): number {
+    if (!this.budgetSettings?.categories) return 0;
+
+    const category = this.budgetSettings.categories.find(
+      (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
+    );
+
+    return category ? category.budget : 0;
+  }
+
+  // Get amount spent for a specific category
+  getCategorySpent(categoryName: string): number {
+    if (!this.budgetSettings?.categories) return 0;
+
+    const category = this.budgetSettings.categories.find(
+      (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
+    );
+
+    return category ? category.spent : 0;
+  }
+
+  // Calculate budget utilization percentage for a category
+  getCategoryBudgetUtilization(categoryName: string): number {
+    const budget = this.getCategoryBudget(categoryName);
+    const spent = this.getCategorySpent(categoryName);
+
+    if (budget <= 0) return 0;
+    return (spent / budget) * 100;
+  }
+
+  // Check if a category is over budget
+  isCategoryOverBudget(categoryName: string): boolean {
+    return this.getCategoryBudgetUtilization(categoryName) >= 100;
+  }
+
+  // Get budget status for a category
+  getCategoryBudgetStatus(categoryName: string): 'safe' | 'warning' | 'danger' {
+    const utilization = this.getCategoryBudgetUtilization(categoryName);
+    const alertThreshold = this.budgetSettings?.alertThreshold || 80;
+
+    if (utilization >= 100) return 'danger';
+    if (utilization >= alertThreshold) return 'warning';
+    return 'safe';
+  }
+
+  // Get remaining budget for a category
+  getCategoryRemainingBudget(categoryName: string): number {
+    const budget = this.getCategoryBudget(categoryName);
+    const spent = this.getCategorySpent(categoryName);
+
+    return budget - spent;
+  }
+
+  // ===============================
+  // FILTERING AND SORTING
+  // ===============================
+
+  // Get categories sorted by amount (descending)
+  getSortedExpenseCategories(): CategoryDetail[] {
+    if (!this.stats?.expenseCategories) return [];
+    return [...this.stats.expenseCategories].sort((a, b) => b.totalAmount - a.totalAmount);
+  }
+
+  // Get categories sorted by amount (descending)
+  getSortedRevenueCategories(): CategoryDetail[] {
+    if (!this.stats?.revenueCategories) return [];
+    return [...this.stats.revenueCategories].sort((a, b) => b.totalAmount - a.totalAmount);
+  }
+
+  // Filter categories by search term
+  filterCategories(categories: CategoryDetail[], searchTerm: string): CategoryDetail[] {
+    if (!searchTerm) return categories;
+
+    const term = searchTerm.toLowerCase();
+    return categories.filter(category =>
+      category.category.toLowerCase().includes(term) ||
+      category.type.toLowerCase().includes(term)
+    );
   }
 
   // ===============================
@@ -233,37 +335,36 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
 
   getCategoryColor(category: string): string {
     const map: Record<string, string> = {
-      // Food: '#ef4444',        // red
-      // Transport: '#f87171',   // light red
-      // Entertainment: '#fbbf24', // yellow-orange
-      // Bills: '#facc15',       // yellow
-      // Shopping: '#fde68a',    // pale yellow
-      // Healthcare: '#fcd34d',   // golden yellow
-      // Salary: '#16a34a',      // green
-      // Freelance: '#22c55e',   // lime-green
-      // Investment: '#7c3aed',  // purple
-      // Gift: '#a78bfa',        // light purple
-      // Other: '#6b7280'        // gr
-      Food: '#dc2626',        // deep red
-      Transport: '#ea580c',   // orange-red
-      Entertainment: '#f97316', // bright orange
-      Bills: '#f59e0b',       // amber
-      Shopping: '#eab308',    // yellow-gold
-      Healthcare: '#ca8a04',  // golden yellow
-      Education: '#a16207',   // dark yellow
-      Travel: '#854d0e',      // brown-yellow
-      Utilities: '#713f12',   // dark brown-yellow
-      Subscription: '#5c3c1c', // very dark yellow-brown
+      Food: '#dc2626',
+      Transport: '#ea580c',
+      Entertainment: '#f97316',
+      Bills: '#f59e0b',
+      Shopping: '#eab308',
+      Healthcare: '#ca8a04',
+      Education: '#a16207',
+      Travel: '#854d0e',
+      Utilities: '#713f12',
+      Subscription: '#5c3c1c',
 
-      Salary: '#065f46',      // deep green
-      Freelance: '#059669',   // emerald green
-      Investment: '#0d9488',  // teal
-      Business: '#a855f7',        // purple
-      Gift: '#6366f1',       // indigo
-      Rental: '#8b5cf6',      // violet
-      Other: '#0891b2',    // cyan-blue
+      Salary: '#065f46',
+      Freelance: '#059669',
+      Investment: '#0d9488',
+      Business: '#a855f7',
+      Gift: '#6366f1',
+      Rental: '#8b5cf6',
+      Other: '#0891b2',
     };
     return map[category] ?? '#6b7280';
+  }
+
+  // Get budget status color
+  getBudgetStatusColor(status: 'safe' | 'warning' | 'danger'): string {
+    const colors = {
+      safe: '#10b981',
+      warning: '#f59e0b',
+      danger: '#ef4444'
+    };
+    return colors[status];
   }
 
   // ===============================
@@ -275,5 +376,92 @@ export class CategoryStatsComponent implements OnInit, OnDestroy {
 
   getTrendClass(trend: 'up' | 'down' | 'stable'): string {
     return `trend-${trend}`;
+  }
+
+  // ===============================
+  // SETTINGS-RELATED METHODS
+  // ===============================
+
+  // Check if budget alerts are enabled
+  areBudgetAlertsEnabled(): boolean {
+    return this.appSettings?.budgetAlerts &&
+      this.budgetSettings?.enableBudgetAlerts;
+  }
+
+  // Get alert threshold
+  getAlertThreshold(): number {
+    return this.budgetSettings?.alertThreshold || 80;
+  }
+
+  // Check if notifications are enabled
+  areNotificationsEnabled(): boolean {
+    return this.appSettings?.enableNotifications || false;
+  }
+
+  // Navigate to settings page
+  navigateToSettings(): void {
+    this.router.navigate(['/settings']);
+  }
+
+  // ===============================
+  // UTILITY METHODS
+  // ===============================
+
+  // Calculate total for a list of categories
+  calculateTotal(categories: CategoryDetail[]): number {
+    return categories.reduce((sum, category) => sum + category.totalAmount, 0);
+  }
+
+  // Get average transaction amount for a list of categories
+  getAverageTransaction(categories: CategoryDetail[]): number {
+    if (!categories.length) return 0;
+
+    const totalAmount = this.calculateTotal(categories);
+    const totalTransactions = categories.reduce((sum, category) =>
+      sum + category.transactionCount, 0);
+
+    return totalTransactions > 0 ? totalAmount / totalTransactions : 0;
+  }
+
+  // Check if data is available
+  hasData(): boolean {
+    return !!this.stats &&
+      (this.stats.expenseCategories?.length > 0 ||
+        this.stats.revenueCategories?.length > 0);
+  }
+
+  // Get time frame label
+  getTimeFrameLabel(): string {
+    const timeFrame = this.timeFrames.find(tf => tf.value === this.selectedTimeFrame);
+    return timeFrame?.label || this.selectedTimeFrame;
+  }
+
+  // Refresh data
+  refreshData(): void {
+    this.loadCategoryStats();
+  }
+
+  // Export category data
+  exportCategoryData(): void {
+    if (!this.stats) return;
+
+    const data = {
+      currency: this.currentCurrency,
+      generatedAt: new Date().toISOString(),
+      ...this.stats
+    };
+
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `category-statistics-${this.selectedTimeFrame}-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+    console.log('Category data exported successfully');
   }
 }

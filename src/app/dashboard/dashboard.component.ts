@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TransactionService } from '../services/transaction.service';
 import { ThemeService } from '../theme.service';
+import { SettingsService } from '../services/settings.service';
 import {
   Transaction,
   TransactionSummary,
@@ -41,11 +42,18 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   hasChartData = false;
   hasError = false;
   errorMessage = '';
-  private themeSubscription!: Subscription;
+
+  private subscriptions: Subscription[] = [];
+
+  // Budget alerts
+  showBudgetAlert = false;
+  budgetAlertMessage = '';
+  budgetAlertType: 'warning' | 'danger' = 'warning';
 
   constructor(
     private transactionService: TransactionService,
     private themeService: ThemeService,
+    private settingsService: SettingsService,
     private router: Router,
     private authService: AuthService
   ) { }
@@ -54,12 +62,31 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     console.log('🏠 Dashboard initialized');
     console.log('👤 Current User:', this.authService.getCurrentUser());
 
-    this.themeSubscription = this.themeService.isDarkMode$.subscribe(
+    // Request notification permission if enabled
+    this.settingsService.requestNotificationPermission();
+
+    // Subscribe to theme changes
+    const themeSub = this.themeService.isDarkMode$.subscribe(
       (mode: boolean) => {
         this.isDarkMode = mode;
         this.updatePieChart();
       }
     );
+    this.subscriptions.push(themeSub);
+
+    // Subscribe to settings changes
+    const appSettingsSub = this.settingsService.appSettings$.subscribe(() => {
+      console.log('🔄 Settings changed, updating UI');
+      this.updatePieChart();
+    });
+    this.subscriptions.push(appSettingsSub);
+
+    const budgetSettingsSub = this.settingsService.budgetSettings$.subscribe(() => {
+      console.log('🔄 Budget settings changed, checking alerts');
+      this.checkBudgetAlerts();
+    });
+    this.subscriptions.push(budgetSettingsSub);
+
     this.loadDashboardData();
   }
 
@@ -70,7 +97,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy() {
-    this.themeSubscription?.unsubscribe();
+    this.subscriptions.forEach(sub => sub.unsubscribe());
     this.destroyChart();
   }
 
@@ -101,9 +128,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
           console.error('❌ All data sources failed to load');
         } else {
           console.log('✅ Dashboard data loaded successfully!');
-          console.log('📈 Final transactions:', this.transactions);
-          console.log('💰 Final summary:', this.summary);
-          console.log('📂 Final categories:', this.categorySummary);
+
+          // Check budget alerts after data is loaded
+          this.checkBudgetAlerts();
+
           setTimeout(() => this.updatePieChart(), 50);
         }
       }
@@ -119,7 +147,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transactionService.getTransactions(this.selectedTimeFrame, 5)
       .subscribe({
         next: (data: Transaction[]) => {
-          console.log('📥 Received transactions:', data);
           this.transactions = data || [];
           finish();
         },
@@ -130,13 +157,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transactionService.getTransactionSummary(this.selectedTimeFrame)
       .subscribe({
         next: (summary: TransactionSummary) => {
-          console.log('📥 Received summary:', summary);
           this.summary = summary;
-
           const expenses = Number(summary?.totalExpenses) || 0;
           const revenue = Number(summary?.totalRevenue) || 0;
           this.hasChartData = (expenses > 0 || revenue > 0);
-
           finish();
         },
         error: (error) => handleError('Summary', error)
@@ -146,12 +170,60 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transactionService.getCategorySummary(this.selectedTimeFrame)
       .subscribe({
         next: (data: CategorySummary[]) => {
-          console.log('📥 Received categories:', data);
           this.categorySummary = data || [];
           finish();
         },
         error: (error) => handleError('Categories', error)
       });
+  }
+
+  /**
+   * Check if spending is approaching or exceeding budget limits
+   */
+  checkBudgetAlerts() {
+    if (!this.settingsService.shouldShowBudgetAlerts()) {
+      this.showBudgetAlert = false;
+      return;
+    }
+
+    const budgetSettings = this.settingsService.getBudgetSettings();
+    const totalExpenses = Number(this.summary?.totalExpenses) || 0;
+
+    // Check monthly budget
+    if (this.selectedTimeFrame === 'month') {
+      const budgetUsed = (totalExpenses / budgetSettings.monthlyBudget) * 100;
+
+      if (totalExpenses >= budgetSettings.monthlyBudget) {
+        this.showBudgetAlert = true;
+        this.budgetAlertType = 'danger';
+        this.budgetAlertMessage = `⚠️ You've exceeded your monthly budget of ${this.formatCurrency(budgetSettings.monthlyBudget)} by ${this.formatCurrency(totalExpenses - budgetSettings.monthlyBudget)}!`;
+        this.settingsService.showNotification('Budget Alert', this.budgetAlertMessage);
+      } else if (budgetUsed >= budgetSettings.alertThreshold) {
+        this.showBudgetAlert = true;
+        this.budgetAlertType = 'warning';
+        this.budgetAlertMessage = `📊 You've used ${budgetUsed.toFixed(0)}% of your monthly budget (${this.formatCurrency(totalExpenses)} of ${this.formatCurrency(budgetSettings.monthlyBudget)})`;
+      } else {
+        this.showBudgetAlert = false;
+      }
+    }
+
+    // Check weekly budget
+    if (this.selectedTimeFrame === 'week') {
+      const budgetUsed = (totalExpenses / budgetSettings.weeklyBudget) * 100;
+
+      if (totalExpenses >= budgetSettings.weeklyBudget) {
+        this.showBudgetAlert = true;
+        this.budgetAlertType = 'danger';
+        this.budgetAlertMessage = `⚠️ You've exceeded your weekly budget of ${this.formatCurrency(budgetSettings.weeklyBudget)} by ${this.formatCurrency(totalExpenses - budgetSettings.weeklyBudget)}!`;
+        this.settingsService.showNotification('Budget Alert', this.budgetAlertMessage);
+      } else if (budgetUsed >= budgetSettings.alertThreshold) {
+        this.showBudgetAlert = true;
+        this.budgetAlertType = 'warning';
+        this.budgetAlertMessage = `📊 You've used ${budgetUsed.toFixed(0)}% of your weekly budget (${this.formatCurrency(totalExpenses)} of ${this.formatCurrency(budgetSettings.weeklyBudget)})`;
+      } else {
+        this.showBudgetAlert = false;
+      }
+    }
   }
 
   destroyChart() {
@@ -164,13 +236,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   updatePieChart() {
     this.destroyChart();
 
-    if (!this.pieChartRef?.nativeElement) {
-      console.warn('Canvas element not found');
-      return;
-    }
-
-    if (!this.summary) {
-      console.warn('No summary data available for chart');
+    if (!this.pieChartRef?.nativeElement || !this.summary) {
       return;
     }
 
@@ -179,13 +245,11 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     const total = revenue + expenses;
 
     if (total <= 0) {
-      console.warn('No data for chart');
       return;
     }
 
     const ctx = this.pieChartRef.nativeElement.getContext('2d');
     if (!ctx) {
-      console.error('Failed to get canvas context');
       return;
     }
 
@@ -196,10 +260,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
           labels: ['Revenue', 'Expenses'],
           datasets: [{
             data: [revenue, expenses],
-            backgroundColor: [
-              '#10B981', // Green for revenue
-              '#EF4444'  // Red for expenses
-            ],
+            backgroundColor: ['#10B981', '#EF4444'],
             borderColor: this.isDarkMode ? '#374151' : '#fff',
             borderWidth: 2,
             hoverOffset: 15
@@ -213,10 +274,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
               position: 'bottom',
               labels: {
                 color: this.isDarkMode ? '#D1D5DB' : '#4B5563',
-                font: {
-                  size: 14,
-                  family: "'Inter', sans-serif"
-                },
+                font: { size: 14, family: "'Inter', sans-serif" },
                 padding: 20,
                 usePointStyle: true
               }
@@ -232,7 +290,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
                   const label = context.label || '';
                   const value = context.parsed;
                   const percentage = ((value / total) * 100).toFixed(1);
-                  return `${label}: $${value.toLocaleString()} (${percentage}%)`;
+                  return `${label}: ${this.formatCurrency(value)} (${percentage}%)`;
                 }
               }
             }
@@ -245,20 +303,41 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   formatCurrency(amount: number | null | undefined): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount ?? 0);
+    return this.settingsService.formatCurrency(amount);
+  }
+
+  formatDate(date: Date | string): string {
+    return this.settingsService.formatDate(date);
+  }
+
+  getBudgetProgress(): number {
+    const totalExpenses = Number(this.summary?.totalExpenses) || 0;
+    const budgetSettings = this.settingsService.getBudgetSettings();
+
+    if (this.selectedTimeFrame === 'month') {
+      return Math.min((totalExpenses / budgetSettings.monthlyBudget) * 100, 100);
+    } else if (this.selectedTimeFrame === 'week') {
+      return Math.min((totalExpenses / budgetSettings.weeklyBudget) * 100, 100);
+    }
+
+    return 0;
+  }
+
+  getBudgetStatusClass(): string {
+    const progress = this.getBudgetProgress();
+    const threshold = this.settingsService.getBudgetSettings().alertThreshold;
+
+    if (progress >= 100) return 'over-budget';
+    if (progress >= threshold) return 'near-budget';
+    return 'under-budget';
   }
 
   getExpenseCategories(): CategorySummary[] {
-    console.log(`${this.categorySummary}`);
     return this.categorySummary.filter((c: CategorySummary) => c.type === 'expense');
   }
 
   getRevenueCategories(): CategorySummary[] {
     return this.categorySummary.filter((c: CategorySummary) => c.type === 'revenue');
-  }
-
-  formatDate(date: Date): string {
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   showFullTransactions(): void {
@@ -267,5 +346,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   retryLoad(): void {
     this.loadDashboardData();
+  }
+
+  dismissBudgetAlert(): void {
+    this.showBudgetAlert = false;
   }
 }

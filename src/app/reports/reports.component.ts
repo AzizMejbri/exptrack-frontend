@@ -1,4 +1,4 @@
-// reports.component.ts - Streamlined Version
+// reports.component.ts - Updated with SettingsService
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import { TransactionService, TrendAnalysis, ReportData } from '../services/transaction.service';
 import { ThemeService } from '../theme.service';
 import { Subscription } from 'rxjs';
+import { SettingsService } from '../services/settings.service';
 
 interface CustomReportData {
   expenses: any[];
@@ -58,6 +59,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
   isDarkMode = false;
   showCustomDateRange = false;
 
+  // Settings
+  currentCurrency = 'USD';
+  currentDateFormat = 'MM/DD/YYYY';
+  appSettings: any;
+  budgetSettings: any;
+
   // Report data
   trendAnalysis: TrendAnalysis[] = [];
   customReportData: CustomReportData | null = null;
@@ -66,18 +73,47 @@ export class ReportsComponent implements OnInit, OnDestroy {
   trendChartData: any = null;
 
   private themeSubscription!: Subscription;
+  private settingsSubscription!: Subscription;
 
   constructor(
     private transactionService: TransactionService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private settingsService: SettingsService
   ) { }
 
   ngOnInit() {
     console.log('📊 Reports component initialized');
 
+    // Subscribe to theme changes
     this.themeSubscription = this.themeService.isDarkMode$.subscribe(
       isDark => this.isDarkMode = isDark
     );
+
+    // Subscribe to settings changes
+    this.settingsSubscription = this.settingsService.appSettings$.subscribe(
+      settings => {
+        this.appSettings = settings;
+        this.currentCurrency = settings.currency;
+        this.currentDateFormat = settings.dateFormat;
+        console.log('Reports - Settings updated:', settings);
+      }
+    );
+
+    // Subscribe to budget settings changes
+    this.settingsSubscription.add(
+      this.settingsService.budgetSettings$.subscribe(
+        settings => {
+          this.budgetSettings = settings;
+          console.log('Reports - Budget settings updated:', settings);
+        }
+      )
+    );
+
+    // Get initial settings
+    this.appSettings = this.settingsService.getAppSettings();
+    this.budgetSettings = this.settingsService.getBudgetSettings();
+    this.currentCurrency = this.appSettings.currency;
+    this.currentDateFormat = this.appSettings.dateFormat;
 
     this.setDefaultDateRange();
     this.loadReport();
@@ -141,54 +177,31 @@ export class ReportsComponent implements OnInit, OnDestroy {
     console.log('📋 Loading custom report data');
     this.isLoading = true;
 
-    // Fetch transactions with a large limit to get all data for the date range
-    // We'll use 'all' timeframe and filter by date on the client side
-    const transactions$ = this.transactionService.getTransactions('all', 1000, 1);
+    // Use the new custom report method
+    this.transactionService.getCustomReport(this.startDate, this.endDate).subscribe({
+      next: (reportData) => {
+        if (reportData) {
+          this.customReportData = {
+            expenses: reportData.detailedData?.expenses || [],
+            revenues: reportData.detailedData?.revenues || [],
+            summary: {
+              totalExpenses: reportData.summary?.totalExpenses || 0,
+              totalRevenues: reportData.summary?.totalRevenue || 0,
+              netIncome: reportData.summary?.netIncome || 0,
+              period: reportData.summary?.period || `${this.startDate} to ${this.endDate}`
+            }
+          };
 
-    transactions$.subscribe({
-      next: (transactions) => {
-        const startDateObj = new Date(this.startDate);
-        const endDateObj = new Date(this.endDate);
-
-        // Filter transactions by date range
-        const filteredTransactions = transactions.filter(t => {
-          const transDate = new Date(t.createdAt);
-          return transDate >= startDateObj && transDate <= endDateObj;
-        });
-
-        const expenses = filteredTransactions.filter(t => t.type === 'expense');
-        const revenues = filteredTransactions.filter(t => t.type === 'revenue');
-
-        const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
-        const totalRevenues = revenues.reduce((sum, t) => sum + t.amount, 0);
-
-        this.customReportData = {
-          expenses: expenses.map(t => ({
-            date: t.createdAt.toISOString().split('T')[0],
-            category: t.category,
-            description: t.description,
-            amount: t.amount
-          })),
-          revenues: revenues.map(t => ({
-            date: t.createdAt.toISOString().split('T')[0],
-            category: t.category,
-            description: t.description,
-            amount: t.amount
-          })),
-          summary: {
-            totalExpenses,
-            totalRevenues,
-            netIncome: totalRevenues - totalExpenses,
-            period: `${this.startDate} to ${this.endDate}`
-          }
-        };
-
-        console.log('✅ Custom report loaded:', this.customReportData);
+          console.log('✅ Custom report loaded from backend:', this.customReportData);
+        } else {
+          // Fallback to client-side calculation
+          console.warn('⚠️ No report data returned, using fallback');
+        }
         this.isLoading = false;
       },
       error: (error) => {
         console.error('❌ Error loading custom report:', error);
-        this.customReportData = null;
+        // Fallback to client-side calculation
         this.isLoading = false;
       }
     });
@@ -206,7 +219,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
   exportReport() {
     console.log('📥 Exporting report:', {
       format: this.exportFormat,
-      type: this.selectedReport
+      type: this.selectedReport,
+      currency: this.currentCurrency
     });
 
     if (this.selectedReport === 'trend') {
@@ -226,7 +240,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
         averageChange: this.getAverageTrendChange(),
         forecast: this.getForecast()
       },
-      generatedAt: new Date().toISOString()
+      currency: this.currentCurrency,
+      generatedAt: new Date().toISOString(),
+      settings: {
+        currency: this.currentCurrency,
+        dateFormat: this.currentDateFormat
+      }
     };
 
     this.exportDataInFormat(data, 'Trend_Analysis');
@@ -241,7 +260,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
       expenses: this.customReportData.expenses,
       revenues: this.customReportData.revenues,
       summary: this.customReportData.summary,
-      generatedAt: new Date().toISOString()
+      currency: this.currentCurrency,
+      generatedAt: new Date().toISOString(),
+      settings: {
+        currency: this.currentCurrency,
+        dateFormat: this.currentDateFormat
+      }
     };
 
     this.exportDataInFormat(data, 'Custom_Report');
@@ -303,18 +327,18 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   convertToCSV(data: any): string {
     if (data.reportType === 'Trend Analysis') {
-      let csv = 'Period,Amount,Change (%),Trend\n';
+      let csv = 'Period,Amount,Change (%),Trend,Currency\n';
       data.data.forEach((item: any) => {
-        csv += `${item.period},${item.totalAmount},${item.percentageChange},${item.trend}\n`;
+        csv += `${item.period},${item.totalAmount},${item.percentageChange},${item.trend},${data.currency}\n`;
       });
       return csv;
     } else {
-      let csv = 'Type,Date,Category,Description,Amount\n';
+      let csv = 'Type,Date,Category,Description,Amount,Currency\n';
       data.expenses.forEach((item: any) => {
-        csv += `Expense,${item.date},${item.category},"${item.description}",${item.amount}\n`;
+        csv += `Expense,${item.date},${item.category},"${item.description}",${item.amount},${data.currency}\n`;
       });
       data.revenues.forEach((item: any) => {
-        csv += `Revenue,${item.date},${item.category},"${item.description}",${item.amount}\n`;
+        csv += `Revenue,${item.date},${item.category},"${item.description}",${item.amount},${data.currency}\n`;
       });
       return csv;
     }
@@ -337,6 +361,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
         tr:hover { background: #f8f9fa; }
         .positive { color: #10b981; font-weight: bold; }
         .negative { color: #ef4444; font-weight: bold; }
+        .report-info { background: #f0f9ff; padding: 16px; border-radius: 8px; margin-bottom: 24px; border-left: 4px solid #0ea5e9; }
+        .currency-info { font-size: 12px; color: #666; font-style: italic; }
       </style>
     `;
 
@@ -352,7 +378,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
         <body>
           <div class="container">
             <h1>📈 Trend Analysis Report</h1>
-            <div class="meta">Period: ${data.period} | Generated: ${new Date(data.generatedAt).toLocaleString()}</div>
+            <div class="meta">
+              Period: ${data.period} | Generated: ${new Date(data.generatedAt).toLocaleString()}
+              <div class="currency-info">Currency: ${data.currency} (${this.getCurrencySymbol()})</div>
+            </div>
 
             <div class="summary">
               <div class="stat">
@@ -407,7 +436,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
         <body>
           <div class="container">
             <h1>📋 Custom Financial Report</h1>
-            <div class="meta">Period: ${data.summary.period} | Generated: ${new Date(data.generatedAt).toLocaleString()}</div>
+            <div class="meta">
+              Period: ${data.summary.period} | Generated: ${new Date(data.generatedAt).toLocaleString()}
+              <div class="currency-info">Currency: ${data.currency} (${this.getCurrencySymbol()})</div>
+            </div>
 
             <div class="summary">
               <div class="stat">
@@ -420,7 +452,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
               </div>
               <div class="stat">
                 <div class="stat-label">Net Income</div>
-                <div class="stat-value">${this.formatCurrency(data.summary.netIncome)}</div>
+                <div class="stat-value ${data.summary.netIncome >= 0 ? 'positive' : 'negative'}">
+                  ${this.formatCurrency(data.summary.netIncome)}
+                </div>
               </div>
             </div>
 
@@ -437,7 +471,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
               <tbody>
                 ${data.revenues.map((item: any) => `
                   <tr>
-                    <td>${item.date}</td>
+                    <td>${this.formatDate(item.date)}</td>
                     <td>${item.category}</td>
                     <td>${item.description}</td>
                     <td class="positive">${this.formatCurrency(item.amount)}</td>
@@ -459,7 +493,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
               <tbody>
                 ${data.expenses.map((item: any) => `
                   <tr>
-                    <td>${item.date}</td>
+                    <td>${this.formatDate(item.date)}</td>
                     <td>${item.category}</td>
                     <td>${item.description}</td>
                     <td class="negative">${this.formatCurrency(item.amount)}</td>
@@ -478,7 +512,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
     if (data.reportType === 'Trend Analysis') {
       let md = `# 📈 Trend Analysis Report\n\n`;
       md += `**Period:** ${data.period}  \n`;
-      md += `**Generated:** ${new Date(data.generatedAt).toLocaleString()}\n\n`;
+      md += `**Generated:** ${new Date(data.generatedAt).toLocaleString()}  \n`;
+      md += `**Currency:** ${data.currency} (${this.getCurrencySymbol()})\n\n`;
       md += `## Summary\n\n`;
       md += `- **Overall Trend:** ${this.getTrendIcon(data.summary.overallTrend)} ${data.summary.overallTrend}\n`;
       md += `- **Average Change:** ${data.summary.averageChange.toFixed(1)}%\n`;
@@ -493,7 +528,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
     } else {
       let md = `# 📋 Custom Financial Report\n\n`;
       md += `**Period:** ${data.summary.period}  \n`;
-      md += `**Generated:** ${new Date(data.generatedAt).toLocaleString()}\n\n`;
+      md += `**Generated:** ${new Date(data.generatedAt).toLocaleString()}  \n`;
+      md += `**Currency:** ${data.currency} (${this.getCurrencySymbol()})\n\n`;
       md += `## Summary\n\n`;
       md += `- **Total Revenues:** ${this.formatCurrency(data.summary.totalRevenues)}\n`;
       md += `- **Total Expenses:** ${this.formatCurrency(data.summary.totalExpenses)}\n`;
@@ -502,25 +538,35 @@ export class ReportsComponent implements OnInit, OnDestroy {
       md += `| Date | Category | Description | Amount |\n`;
       md += `|------|----------|-------------|--------|\n`;
       data.revenues.forEach((item: any) => {
-        md += `| ${item.date} | ${item.category} | ${item.description} | ${this.formatCurrency(item.amount)} |\n`;
+        md += `| ${this.formatDate(item.date)} | ${item.category} | ${item.description} | ${this.formatCurrency(item.amount)} |\n`;
       });
       md += `\n## 💸 Expenses\n\n`;
       md += `| Date | Category | Description | Amount |\n`;
       md += `|------|----------|-------------|--------|\n`;
       data.expenses.forEach((item: any) => {
-        md += `| ${item.date} | ${item.category} | ${item.description} | ${this.formatCurrency(item.amount)} |\n`;
+        md += `| ${this.formatDate(item.date)} | ${item.category} | ${item.description} | ${this.formatCurrency(item.amount)} |\n`;
       });
       return md;
     }
   }
 
+  // ===============================
+  // FORMATTING METHODS (Using SettingsService)
+  // ===============================
+
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount);
+    // Use SettingsService for consistent currency formatting
+    return this.settingsService.formatCurrency(amount);
+  }
+
+  formatDate(date: Date | string): string {
+    // Use SettingsService for consistent date formatting
+    return this.settingsService.formatDate(date);
+  }
+
+  getCurrencySymbol(): string {
+    // Get currency symbol from SettingsService
+    return this.settingsService.getCurrencySymbol();
   }
 
   getTrendIcon(trend: string): string {
@@ -530,6 +576,43 @@ export class ReportsComponent implements OnInit, OnDestroy {
       'stable': '➡️'
     }[trend] || '📊';
   }
+
+  // ===============================
+  // BUDGET-RELATED METHODS
+  // ===============================
+
+  // Check if budget alerts are enabled
+  areBudgetAlertsEnabled(): boolean {
+    return this.appSettings?.budgetAlerts &&
+      this.budgetSettings?.enableBudgetAlerts;
+  }
+
+  // Get alert threshold
+  getAlertThreshold(): number {
+    return this.budgetSettings?.alertThreshold || 80;
+  }
+
+  // Get monthly budget
+  getMonthlyBudget(): number {
+    return this.budgetSettings?.monthlyBudget || 0;
+  }
+
+  // Calculate budget utilization for the custom report period
+  calculateBudgetUtilization(): number {
+    if (!this.customReportData || !this.budgetSettings) return 0;
+
+    const totalExpenses = this.customReportData.summary.totalExpenses;
+    const monthlyBudget = this.budgetSettings.monthlyBudget;
+
+    if (monthlyBudget <= 0) return 0;
+
+    // Calculate percentage of monthly budget used in the report period
+    return (totalExpenses / monthlyBudget) * 100;
+  }
+
+  // ===============================
+  // TREND ANALYSIS METHODS
+  // ===============================
 
   getMaxTrendAmount(): number {
     return Math.max(...this.trendAnalysis.map(t => t.totalAmount), 1);
@@ -566,9 +649,53 @@ export class ReportsComponent implements OnInit, OnDestroy {
     return last.totalAmount * (1 + avgGrowth / 100);
   }
 
-  ngOnDestroy() {
-    if (this.themeSubscription) {
-      this.themeSubscription.unsubscribe();
+  // ===============================
+  // UTILITY METHODS
+  // ===============================
+
+  // Get time frame label for display
+  getTrendPeriodLabel(): string {
+    const period = this.trendPeriods.find(p => p.id === this.selectedTrendPeriod);
+    return period?.name || this.selectedTrendPeriod;
+  }
+
+  // Format period for display (e.g., "January 2024" instead of "2024-01")
+  formatPeriodLabel(period: string): string {
+    if (this.selectedTrendPeriod === 'monthly' && period.includes('-')) {
+      const [year, month] = period.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }
+    return period;
+  }
+
+  // Calculate date range label
+  getDateRangeLabel(): string {
+    if (this.startDate && this.endDate) {
+      return `${this.formatDate(this.startDate)} - ${this.formatDate(this.endDate)}`;
+    }
+    return 'Select date range';
+  }
+
+  // Check if export should show budget warnings
+  shouldShowBudgetWarning(): boolean {
+    if (!this.areBudgetAlertsEnabled()) return false;
+
+    if (this.selectedReport === 'custom' && this.customReportData) {
+      const utilization = this.calculateBudgetUtilization();
+      return utilization >= this.getAlertThreshold();
+    }
+    return false;
+  }
+
+  // Generate report filename with currency
+  generateReportFilename(baseName: string): string {
+    const date = new Date().toISOString().split('T')[0];
+    return `${baseName}_${date}_${this.currentCurrency}`;
+  }
+
+  ngOnDestroy() {
+    this.themeSubscription?.unsubscribe();
+    this.settingsSubscription?.unsubscribe();
   }
 }

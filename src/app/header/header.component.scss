@@ -1,4 +1,4 @@
-// header.component.scss
+
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -30,13 +30,15 @@
   }
 }
 
+/* ================= THEME TOGGLE ================= */
+
 .theme-toggle {
   background: none;
   border: none;
   padding: 8px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
 
   &:hover {
     background: #f3f4f6;
@@ -52,8 +54,16 @@
   }
 }
 
+/* ================= USER MENU ================= */
+
 .user-menu {
   position: relative;
+
+  &.open {
+    .dropdown-arrow {
+      transform: rotate(180deg);
+    }
+  }
 
   .user-button {
     display: flex;
@@ -81,11 +91,13 @@
       color: white;
       font-weight: 600;
       font-size: 14px;
+      user-select: none;
     }
 
     .user-name {
       font-weight: 500;
       color: #374151;
+      white-space: nowrap;
     }
 
     .dropdown-arrow {
@@ -95,25 +107,25 @@
     }
   }
 
-  &:hover .dropdown-arrow {
-    transform: rotate(180deg);
-  }
+  /* ================= DROPDOWN ================= */
 
   .dropdown-menu {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 8px);
     right: 0;
+    min-width: 200px;
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 1001;
+
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-10px);
-    transition: all 0.2s ease;
+    transform: translateY(-6px);
+    transition: all 0.18s ease;
 
-    .user-menu:hover & {
+    &.open {
       opacity: 1;
       visibility: visible;
       transform: translateY(0);
@@ -123,22 +135,37 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      width: 100%;
       padding: 12px 16px;
+      background: none;
+      border: none;
+      text-align: left;
       cursor: pointer;
+      font-size: 14px;
+      color: #374151;
       transition: background 0.2s ease;
+
+      svg {
+        flex-shrink: 0;
+      }
 
       &:hover {
         background: #f9fafb;
       }
 
-      .item-icon {
-        font-size: 16px;
+      &.logout {
+        color: #dc2626;
+
+        svg {
+          stroke: #dc2626;
+        }
       }
     }
   }
 }
 
-// Dark theme styles
+/* ================= DARK THEME ================= */
+
 :host-context(.dark-theme) {
   .app-header {
     background: #1f2937;
@@ -154,12 +181,12 @@
   }
 
   .user-button {
-    .user-name {
-      color: #f9fafb;
-    }
-
     &:hover {
       background: #374151;
+    }
+
+    .user-name {
+      color: #f9fafb;
     }
   }
 
@@ -172,6 +199,14 @@
 
       &:hover {
         background: #374151;
+      }
+
+      &.logout {
+        color: #f87171;
+
+        svg {
+          stroke: #f87171;
+        }
       }
     }
   }
